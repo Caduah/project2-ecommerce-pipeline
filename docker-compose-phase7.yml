@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - USE_LOCAL_DB=true
+      - LOCAL_DB_URL=postgresql://airflow:airflow@postgres:5434/airflow
+      - NEO4J_URI=bolt://neo4j:7688
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=project2neo4j
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ENVIRONMENT=development
+    volumes:
+      - ./api:/app/api
+    depends_on:
+      - postgres
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+
+volumes:
+  postgres_data:

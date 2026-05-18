@@ -1,0 +1,22 @@
+project2:
+  target: local
+  outputs:
+    local:
+      type: postgres
+      host: localhost
+      port: 5434
+      user: airflow
+      password: airflow
+      dbname: airflow
+      schema: dbt_dev
+      threads: 4
+    dev:
+      type: redshift
+      host: your-cluster.redshift.amazonaws.com
+      port: 5439
+      user: admin
+      password: changeme
+      dbname: project2
+      schema: dbt_dev
+      threads: 4
+      connect_timeout: 30

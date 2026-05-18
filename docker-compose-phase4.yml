@@ -1,0 +1,88 @@
+version: "3.8"
+
+services:
+
+  # ── LocalStack — simulates AWS locally ───────────────────────────
+  localstack:
+    image: localstack/localstack:3.4
+    ports:
+      - "4566:4566"     # all AWS services on one port
+    environment:
+      - SERVICES=s3,kinesis,lambda,dynamodb,sns,iam,logs
+      - DEBUG=0
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Bootstrap — creates all AWS resources in LocalStack ──────────
+  bootstrap:
+    image: python:3.11-slim
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    volumes:
+      - ./ingestion:/app/ingestion
+      - ./infrastructure:/app/infrastructure
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install boto3 awscli-local -q &&
+        python infrastructure/scripts/bootstrap_localstack.py
+      "
+
+  # ── Producer — sends events to Kinesis ───────────────────────────
+  producer:
+    image: python:3.11-slim
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    volumes:
+      - ./ingestion:/app/ingestion
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install boto3 tenacity -q &&
+        python ingestion/kinesis/producer_local.py
+      "
+
+  # ── Consumer — reads Kinesis and writes to S3 ────────────────────
+  consumer:
+    image: python:3.11-slim
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - S3_BUCKET=project2-data-lake-dev
+    volumes:
+      - ./ingestion:/app/ingestion
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install boto3 pyarrow tenacity -q &&
+        python ingestion/kinesis/consumer_local.py
+      "
+
+volumes:
+  localstack_data:

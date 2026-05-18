@@ -1,0 +1,80 @@
+version: 2
+
+models:
+  - name: mart_customer_360
+    description: "One row per customer with full order, transaction, LTV and risk metrics"
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+      - name: resolved_entity_id
+        tests: [not_null]
+      - name: total_orders
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: estimated_ltv
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: ltv_tier
+        tests:
+          - accepted_values:
+              values: [platinum, gold, silver, bronze, new]
+      - name: churn_status
+        tests:
+          - accepted_values:
+              values: [loyal, active, at_risk, churned]
+
+  - name: mart_daily_order_summary
+    description: "Daily order KPIs by date, country and status"
+    columns:
+      - name: order_date
+        tests: [not_null]
+      - name: order_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: net_revenue
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+  - name: mart_fraud_summary
+    description: "Daily fraud signal summary by risk tier and merchant category"
+    columns:
+      - name: txn_date
+        tests: [not_null]
+      - name: flag_rate_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: high_risk_rate_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: int_customer_order_metrics
+    description: "Per-customer order rollup used by mart_customer_360"
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+      - name: total_orders
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+
+  - name: int_customer_transaction_metrics
+    description: "Per-customer transaction rollup with LTV estimate"
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+      - name: estimated_ltv
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0

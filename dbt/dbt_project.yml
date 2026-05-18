@@ -1,0 +1,39 @@
+name: project2
+version: "2.0.0"
+config-version: 2
+
+profile: project2
+
+model-paths:      ["models"]
+test-paths:       ["tests"]
+seed-paths:       ["seeds"]
+macro-paths:      ["macros"]
+snapshot-paths:   ["snapshots"]
+analysis-paths:   ["analyses"]
+
+target-path:  "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  start_date: "2024-01-01"
+  high_value_threshold: 5000
+
+models:
+  project2:
+    staging:
+      +schema: staging
+      +materialized: view        # staging = views, cheap to rebuild
+      +tags: ["staging"]
+
+    intermediate:
+      +schema: warehouse
+      +materialized: incremental  # intermediate = incremental tables
+      +tags: ["intermediate"]
+      +on_schema_change: append_new_columns
+
+    marts:
+      +schema: gold
+      +materialized: table        # gold marts = full tables, optimised for BI
+      +tags: ["gold"]
+      +post-hook:
+        - "GRANT SELECT ON {{ this }} TO GROUP bi_users"

@@ -1,0 +1,55 @@
+version: 2
+
+sources:
+  - name: staging
+    schema: staging
+    description: "Raw copies of silver Parquet data loaded from S3 via Redshift COPY"
+
+    tables:
+      - name: orders
+        description: "Cleaned order events from the e-commerce platform"
+        loaded_at_field: silver_ts
+        freshness:
+          warn_after: {count: 25, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: order_id
+            description: "Unique order identifier"
+            tests: [unique, not_null]
+          - name: customer_id
+            tests: [not_null]
+          - name: order_ts
+            tests: [not_null]
+          - name: order_status
+            tests:
+              - accepted_values:
+                  values: [pending, confirmed, shipped, delivered, cancelled, refunded]
+          - name: net_amount
+            tests: [not_null]
+
+      - name: transactions
+        description: "Financial transaction events with fraud signals"
+        loaded_at_field: silver_ts
+        freshness:
+          warn_after: {count: 25, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: transaction_id
+            tests: [unique, not_null]
+          - name: customer_id
+            tests: [not_null]
+          - name: merchant_id
+            tests: [not_null]
+          - name: amount
+            tests: [not_null]
+          - name: risk_tier
+            tests:
+              - accepted_values:
+                  values: [LOW, MEDIUM, HIGH]
+
+      - name: customers
+        description: "Normalised customer profiles with entity resolution blocking keys"
+        loaded_at_field: silver_ts
+        columns:
+          - name: customer_id
+            tests: [unique, not_null]

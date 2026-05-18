@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project 2 — Code Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080b12;
+  --surface: #0d1117;
+  --surface2: #161b22;
+  --surface3: #1e2530;
+  --border: #21262d;
+  --border2: #30363d;
+  --text: #e6edf3;
+  --text-muted: #7d8590;
+  --text-dim: #484f58;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --orange: #d29922;
+  --red: #f85149;
+  --purple: #bc8cff;
+  --pink: #ff7b72;
+  --cyan: #39d353;
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.6; overflow-x: hidden; }
+
+/* ── LAYOUT ── */
+.app { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
+
+/* ── TOPBAR ── */
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 0 1.5rem;
+}
+.topbar-logo { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent); font-weight: 500; }
+.topbar-logo span { color: var(--text-muted); }
+.topbar-tabs { display: flex; gap: 0.25rem; }
+.tab-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tab-btn.active, .tab-btn:hover { background: var(--surface3); color: var(--text); }
+.tab-btn.active { color: var(--accent); }
+.topbar-right { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+.badge { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 0.75rem 0;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.sidebar-section { margin-bottom: 0.25rem; }
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  user-select: none;
+}
+.sidebar-header:hover { color: var(--text); }
+.sidebar-header .chevron { transition: transform 0.2s; font-size: 0.6rem; }
+.sidebar-header.open .chevron { transform: rotate(90deg); }
+.sidebar-files { display: none; }
+.sidebar-files.open { display: block; }
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 1rem 0.3rem 1.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+.file-item:hover { background: var(--surface2); color: var(--text); }
+.file-item.active { background: rgba(88,166,255,0.08); border-left-color: var(--accent); color: var(--accent); }
+.file-icon { font-size: 0.9rem; flex-shrink: 0; }
+.file-name { font-family: var(--font-mono); font-size: 0.75rem; }
+
+/* ── MAIN AREA ── */
+.main { overflow: hidden; display: flex; flex-direction: column; }
+
+/* ── TABS (open files) ── */
+.file-tabs {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.file-tabs::-webkit-scrollbar { display: none; }
+.file-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.file-tab.active { background: var(--bg); color: var(--text); border-bottom: 1px solid var(--bg); margin-bottom: -1px; }
+.file-tab:hover:not(.active) { background: var(--surface2); }
+.tab-close { color: var(--text-dim); font-size: 0.7rem; padding: 0.1rem; border-radius: 2px; }
+.tab-close:hover { color: var(--text); background: var(--surface3); }
+
+/* ── CONTENT AREA ── */
+.content { flex: 1; overflow: hidden; position: relative; }
+
+/* ── WELCOME SCREEN ── */
+.welcome {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  gap: 1.5rem;
+}
+.welcome-logo { font-family: var(--font-display); font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.welcome-sub { color: var(--text-muted); font-size: 0.9rem; max-width: 400px; }
+.welcome-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; max-width: 500px; }
+.welcome-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s; text-align: left; }
+.welcome-card:hover { border-color: var(--accent); background: rgba(88,166,255,0.05); }
+.welcome-card-icon { font-size: 1.25rem; margin-bottom: 0.4rem; }
+.welcome-card-name { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
+
+/* ── CODE VIEW ── */
+.code-view { height: 100%; display: flex; flex-direction: column; display: none; }
+.code-view.visible { display: flex; }
+.code-header {
+  padding: 0.5rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+.code-path { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+.code-path .segment { color: var(--text-dim); }
+.code-path .current { color: var(--text); }
+.code-lang { font-family: var(--font-mono); font-size: 0.68rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: var(--surface3); color: var(--text-muted); margin-left: auto; }
+.code-body { flex: 1; overflow: auto; padding: 1rem 0; }
+.code-body::-webkit-scrollbar { width: 6px; height: 6px; }
+.code-body::-webkit-scrollbar-track { background: transparent; }
+.code-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+.code-table { width: 100%; border-collapse: collapse; }
+.code-table td { padding: 0; vertical-align: top; }
+.line-numbers { width: 50px; text-align: right; padding: 0 1rem 0 0.5rem; color: var(--text-dim); font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.6; user-select: none; border-right: 1px solid var(--border); white-space: pre; }
+.line-code { padding: 0 1.5rem; font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.6; white-space: pre; color: var(--text-muted); }
+.line-code:hover { background: rgba(255,255,255,0.02); }
+
+/* ── SYNTAX COLORS ── */
+.kw { color: #ff7b72; }
+.kw2 { color: #79c0ff; }
+.str { color: #a5d6ff; }
+.str2 { color: #96d0ff; }
+.cmt { color: #484f58; font-style: italic; }
+.fn { color: #d2a8ff; }
+.num { color: #79c0ff; }
+.cls { color: #ffa657; }
+.dec { color: #ff7b72; }
+.op { color: #ff7b72; }
+.var2 { color: #e6edf3; }
+.imp { color: #79c0ff; }
+
+/* ── ARCHITECTURE VIEW ── */
+.arch-view { height: 100%; overflow: auto; padding: 2rem; display: none; }
+.arch-view.visible { display: block; }
+.arch-canvas-wrap { position: relative; min-height: 700px; }
+svg.arch-svg { width: 100%; min-height: 700px; }
+
+/* ── CONNECTIONS VIEW ── */
+.connections-view { height: 100%; overflow: auto; padding: 1.5rem; display: none; }
+.connections-view.visible { display: block; }
+.conn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; }
+.conn-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.conn-card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem; }
+.conn-icon { font-size: 1.25rem; }
+.conn-title { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text); }
+.conn-subtitle { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem; }
+.conn-body { padding: 1rem 1.25rem; }
+.conn-flow { display: flex; flex-direction: column; gap: 0.5rem; }
+.conn-step { display: flex; align-items: flex-start; gap: 0.75rem; }
+.conn-step-icon { font-size: 0.85rem; flex-shrink: 0; margin-top: 0.1rem; }
+.conn-step-text { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+.conn-step-text code { font-family: var(--font-mono); font-size: 0.72rem; background: var(--surface2); padding: 0.1rem 0.3rem; border-radius: 3px; color: var(--accent); }
+.conn-arrow { color: var(--text-dim); font-family: var(--font-mono); font-size: 0.7rem; padding-left: 1.6rem; }
+
+/* ── SCROLLBAR ── */
+.welcome.hidden, .code-view.hidden, .arch-view.hidden { display: none !important; }
+
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 56px auto 1fr; }
+  .sidebar { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-logo">project2<span>/pipeline</span></div>
+    <div class="topbar-tabs">
+      <button class="tab-btn active" onclick="switchView('welcome')">🏠 Explorer</button>
+      <button class="tab-btn" onclick="switchView('arch')">🗺 Architecture</button>
+      <button class="tab-btn" onclick="switchView('connections')">🔗 Connections</button>
+    </div>
+    <div class="topbar-right">
+      <span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950">● 38 checks passing</span>
+      <span class="badge" style="background:rgba(88,166,255,0.1);color:#58a6ff">7 phases</span>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="file-tabs" id="fileTabs"></div>
+    <div class="content">
+
+      <!-- WELCOME -->
+      <div class="welcome" id="welcomeView">
+        <div class="welcome-logo">Project 2</div>
+        <p class="welcome-sub">E-commerce & Financial Pipeline · Click any file in the sidebar to view its code, or switch to Architecture / Connections view above.</p>
+        <div class="welcome-grid">
+          <div class="welcome-card" onclick="openFileById('airflow_dag')">
+            <div class="welcome-card-icon">🌀</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">Master DAG</div>
+            <div class="welcome-card-name">airflow/dags/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('orders_nb')">
+            <div class="welcome-card-icon">🔥</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">Orders Spark</div>
+            <div class="welcome-card-name">databricks/notebooks/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('dbt_customer')">
+            <div class="welcome-card-icon">🏗️</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">Customer 360</div>
+            <div class="welcome-card-name">dbt/models/marts/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('kinesis_producer')">
+            <div class="welcome-card-icon">⚡</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">Producer</div>
+            <div class="welcome-card-name">ingestion/kinesis/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('lambda_trigger')">
+            <div class="welcome-card-icon">𝜆</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">Lambda Trigger</div>
+            <div class="welcome-card-name">ingestion/lambda/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('neo4j_schema')">
+            <div class="welcome-card-icon">🕸️</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">Graph Schema</div>
+            <div class="welcome-card-name">neo4j/queries/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('api_main')">
+            <div class="welcome-card-icon">🚀</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">FastAPI Main</div>
+            <div class="welcome-card-name">api/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('rag_query')">
+            <div class="welcome-card-icon">🤖</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">RAG Query</div>
+            <div class="welcome-card-name">api/routers/</div>
+          </div>
+          <div class="welcome-card" onclick="openFileById('entity_res')">
+            <div class="welcome-card-icon">🧬</div>
+            <div class="file-name" style="color:var(--text);margin-bottom:0.2rem">Entity Resolution</div>
+            <div class="welcome-card-name">databricks/notebooks/</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ARCHITECTURE VIEW -->
+      <div class="arch-view" id="archView">
+        <h2 style="font-family:var(--font-display);font-size:1.5rem;margin-bottom:0.5rem">Pipeline Architecture</h2>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:2rem">Click any component to jump to its code. Arrows show data flow direction.</p>
+        <svg class="arch-svg" viewBox="0 0 900 680" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M1 1L9 5L1 9" fill="none" stroke="#30363d" stroke-width="1.5" stroke-linecap="round"/>
+            </marker>
+            <marker id="arr-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M1 1L9 5L1 9" fill="none" stroke="#58a6ff" stroke-width="1.5" stroke-linecap="round"/>
+            </marker>
+            <marker id="arr-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M1 1L9 5L1 9" fill="none" stroke="#3fb950" stroke-width="1.5" stroke-linecap="round"/>
+            </marker>
+            <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+
+          <!-- SOURCES ROW -->
+          <g onclick="openFileById('kinesis_producer')" style="cursor:pointer">
+            <rect x="20" y="30" width="110" height="44" rx="8" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+            <text x="75" y="50" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="10">⚡ Orders</text>
+            <text x="75" y="64" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">App Events</text>
+          </g>
+          <g onclick="openFileById('kinesis_producer')" style="cursor:pointer">
+            <rect x="145" y="30" width="110" height="44" rx="8" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+            <text x="200" y="50" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="10">⚡ Transactions</text>
+            <text x="200" y="64" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Payment Events</text>
+          </g>
+          <g onclick="openFileById('kinesis_producer')" style="cursor:pointer">
+            <rect x="270" y="30" width="110" height="44" rx="8" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+            <text x="325" y="50" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="10">⚡ Clickstream</text>
+            <text x="325" y="64" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Web Events</text>
+          </g>
+
+          <!-- Kinesis → S3 arrows -->
+          <line x1="75" y1="74" x2="75" y2="114" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="200" y1="74" x2="200" y2="114" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="325" y1="74" x2="325" y2="114" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+
+          <!-- S3 BRONZE -->
+          <g onclick="openFileById('s3_setup')" style="cursor:pointer">
+            <rect x="20" y="114" width="360" height="50" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1" opacity="0.8"/>
+            <text x="200" y="135" text-anchor="middle" fill="#d29922" font-family="JetBrains Mono" font-size="11" font-weight="500">🪣 S3 Bronze Zone</text>
+            <text x="200" y="152" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">bronze/ecommerce/orders/ · bronze/financial/transactions/ · bronze/ecommerce/clickstream/</text>
+          </g>
+
+          <!-- S3 → Lambda arrow -->
+          <line x1="200" y1="164" x2="200" y2="194" stroke="#d29922" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="210" y="182" fill="#7d8590" font-family="JetBrains Mono" font-size="8">S3 PUT event</text>
+
+          <!-- LAMBDA -->
+          <g onclick="openFileById('lambda_trigger')" style="cursor:pointer">
+            <rect x="100" y="194" width="200" height="44" rx="8" fill="#161b22" stroke="#ffa657" stroke-width="1"/>
+            <text x="200" y="214" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono" font-size="11">𝜆 Lambda Trigger</text>
+            <text x="200" y="228" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">s3_trigger.py → DynamoDB idempotency</text>
+          </g>
+
+          <!-- Lambda → Airflow -->
+          <line x1="200" y1="238" x2="200" y2="268" stroke="#ffa657" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="210" y="256" fill="#7d8590" font-family="JetBrains Mono" font-size="8">REST API call</text>
+
+          <!-- AIRFLOW -->
+          <g onclick="openFileById('airflow_dag')" style="cursor:pointer">
+            <rect x="50" y="268" width="700" height="50" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+            <text x="400" y="289" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono" font-size="12" font-weight="500">🌀 Apache Airflow MWAA — project2_master_pipeline.py</text>
+            <text x="400" y="306" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">check_bronze → crawl_bronze → transform_bronze_to_silver → entity_resolution → dbt_gold → snowflake + neo4j → summary</text>
+          </g>
+
+          <!-- Airflow → Glue -->
+          <line x1="130" y1="318" x2="80" y2="358" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr-green)"/>
+          <!-- Airflow → Databricks -->
+          <line x1="300" y1="318" x2="300" y2="358" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr-green)"/>
+          <!-- Airflow → dbt -->
+          x<line x1="500" y1="318" x2="500" y2="358" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr-green)"/>
+          <!-- Airflow → Snowflake -->
+          <line x1="640" y1="318" x2="700" y2="358" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+          <!-- GLUE -->
+          <g>
+            <rect x="20" y="358" width="120" height="44" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1" opacity="0.7"/>
+            <text x="80" y="378" text-anchor="middle" fill="#d29922" font-family="JetBrains Mono" font-size="10">AWS Glue</text>
+            <text x="80" y="392" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Schema Catalog</text>
+          </g>
+
+          <!-- DATABRICKS -->
+          <g onclick="openFileById('orders_nb')" style="cursor:pointer">
+            <rect x="160" y="358" width="280" height="44" rx="8" fill="#161b22" stroke="#ff7b72" stroke-width="1"/>
+            <text x="300" y="378" text-anchor="middle" fill="#ff7b72" font-family="JetBrains Mono" font-size="11">🔥 Databricks (PySpark)</text>
+            <text x="300" y="392" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">orders · transactions · customers · entity_resolution</text>
+          </g>
+
+          <!-- DBT -->
+          <g onclick="openFileById('dbt_customer')" style="cursor:pointer">
+            <rect x="455" y="358" width="120" height="44" rx="8" fill="#161b22" stroke="#79c0ff" stroke-width="1"/>
+            <text x="515" y="378" text-anchor="middle" fill="#79c0ff" font-family="JetBrains Mono" font-size="10">🏗️ dbt</text>
+            <text x="515" y="392" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">staging→marts</text>
+          </g>
+
+          <!-- SNOWFLAKE -->
+          <g onclick="openFileById('snowflake_setup')" style="cursor:pointer">
+            <rect x="590" y="358" width="120" height="44" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1"/>
+            <text x="650" y="378" text-anchor="middle" fill="#58a6ff" font-family="JetBrains Mono" font-size="10">❄️ Snowflake</text>
+            <text x="650" y="392" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Snowpipe + Share</text>
+          </g>
+
+          <!-- Databricks → S3 Silver -->
+          <line x1="300" y1="402" x2="300" y2="432" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+
+          <!-- S3 SILVER + REDSHIFT -->
+          <g onclick="openFileById('redshift_schema')" style="cursor:pointer">
+            <rect x="160" y="432" width="280" height="44" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1" opacity="0.8"/>
+            <text x="300" y="452" text-anchor="middle" fill="#d29922" font-family="JetBrains Mono" font-size="10">🪣 S3 Silver/Gold  +  🔴 Redshift</text>
+            <text x="300" y="466" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">silver/ Delta tables · gold/ dbt marts · star schema warehouse</text>
+          </g>
+
+          <!-- S3 → NEO4J -->
+          <line x1="230" y1="476" x2="150" y2="516" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Redshift → FastAPI -->
+          <line x1="370" y1="476" x2="450" y2="516" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+
+          <!-- NEO4J -->
+          <g onclick="openFileById('neo4j_schema')" style="cursor:pointer">
+            <rect x="20" y="516" width="240" height="44" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1"/>
+            <text x="140" y="536" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono" font-size="11">🕸️ Neo4j Knowledge Graph</text>
+            <text x="140" y="550" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">570 nodes · 1069 relationships · SAME_AS edges</text>
+          </g>
+
+          <!-- FASTAPI -->
+          <g onclick="openFileById('api_main')" style="cursor:pointer">
+            <rect x="280" y="516" width="350" height="44" rx="8" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
+            <text x="455" y="536" text-anchor="middle" fill="#bc8cff" font-family="JetBrains Mono" font-size="11">🚀 FastAPI + RAG (Claude)</text>
+            <text x="455" y="550" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="8">/customers · /orders · /fraud · /entities · /query (NL→SQL)</text>
+          </g>
+
+          <!-- NEO4J → FastAPI -->
+          <line x1="260" y1="538" x2="278" y2="538" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="269" y="533" fill="#7d8590" font-family="JetBrains Mono" font-size="7">Bolt</text>
+
+          <!-- FASTAPI → CONSUMERS -->
+          <line x1="455" y1="560" x2="455" y2="600" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="400" y="590" fill="#7d8590" font-family="JetBrains Mono" font-size="8">REST · OpenAPI · RAG</text>
+          <rect x="300" y="600" width="310" height="34" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+          <text x="455" y="621" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="9">BI Dashboards · Analytics Teams · Mobile Apps · Partner APIs</text>
+
+          <!-- LEGEND -->
+          <rect x="730" y="30" width="155" height="160" rx="8" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+          <text x="808" y="50" text-anchor="middle" fill="#7d8590" font-family="JetBrains Mono" font-size="9" font-weight="500">LEGEND</text>
+          <line x1="745" y1="66" x2="775" y2="66" stroke="#3fb950" stroke-width="1.5"/>
+          <text x="782" y="70" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Orchestration</text>
+          <line x1="745" y1="84" x2="775" y2="84" stroke="#58a6ff" stroke-width="1.5"/>
+          <text x="782" y="88" fill="#7d8590" font-family="JetBrains Mono" font-size="8">AWS Services</text>
+          <line x1="745" y1="102" x2="775" y2="102" stroke="#ff7b72" stroke-width="1.5"/>
+          <text x="782" y="106" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Processing</text>
+          <line x1="745" y1="120" x2="775" y2="120" stroke="#d29922" stroke-width="1.5"/>
+          <text x="782" y="124" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Storage</text>
+          <line x1="745" y1="138" x2="775" y2="138" stroke="#bc8cff" stroke-width="1.5"/>
+          <text x="782" y="142" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Serving</text>
+          <line x1="745" y1="156" x2="775" y2="156" stroke="#30363d" stroke-width="1.5"/>
+          <text x="782" y="160" fill="#7d8590" font-family="JetBrains Mono" font-size="8">Data flow</text>
+          <text x="745" y="180" fill="#7d8590" font-family="JetBrains Mono" font-size="7">Click any box</text>
+          <text x="745" y="192" fill="#7d8590" font-family="JetBrains Mono" font-size="7">to view code</text>
+        </svg>
+      </div>
+
+      <!-- CONNECTIONS VIEW -->
+      <div class="connections-view" id="connectionsView">
+        <h2 style="font-family:var(--font-display);font-size:1.5rem;margin-bottom:0.5rem">How Components Connect</h2>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.5rem">Every integration between tools — what calls what, what data passes between them, and which files make it happen.</p>
+        <div class="conn-grid" id="connGrid"></div>
+      </div>
+
+      <!-- CODE VIEW -->
+      <div class="code-view" id="codeView">
+        <div class="code-header">
+          <div class="code-path" id="codePath"></div>
+          <div class="code-lang" id="codeLang"></div>
+        </div>
+        <div class="code-body" id="codeBody"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// FILE REGISTRY
+// ═══════════════════════════════════════════════════════════
+const files = {
+  airflow_dag: {
+    id: 'airflow_dag',
+    name: 'project2_master_pipeline.py',
+    path: ['airflow', 'dags', 'project2_master_pipeline.py'],
+    lang: 'Python',
+    icon: '🌀',
+    section: 'Airflow',
+    code: `<span class="cmt"># airflow/dags/project2_master_pipeline.py</span>
+<span class="cmt"># Master DAG — orchestrates all 7 pipeline stages</span>
+<span class="cmt"># Schedule: daily at 02:00 UTC</span>
+
+<span class="kw">from</span> <span class="imp">airflow</span> <span class="kw">import</span> DAG
+<span class="kw">from</span> <span class="imp">airflow.operators.python</span> <span class="kw">import</span> PythonOperator, BranchPythonOperator
+<span class="kw">from</span> <span class="imp">airflow.providers.databricks.operators.databricks</span> <span class="kw">import</span> DatabricksRunNowOperator
+<span class="kw">from</span> <span class="imp">airflow.providers.snowflake.operators.snowflake</span> <span class="kw">import</span> SnowflakeOperator
+<span class="kw">from</span> <span class="imp">airflow.utils.task_group</span> <span class="kw">import</span> TaskGroup
+
+<span class="cmt"># ── Gate: check bronze data arrived ──────────────────────</span>
+<span class="kw">def</span> <span class="fn">check_bronze_data_arrived</span>(**context):
+    s3 = boto3.client(<span class="str">"s3"</span>)
+    ds = context[<span class="str">"ds"</span>]  <span class="cmt"># execution date YYYY-MM-DD</span>
+    prefixes = [
+        <span class="str">f"bronze/ecommerce/orders/date=</span><span class="kw2">{ds}</span><span class="str">/"</span>,
+        <span class="str">f"bronze/financial/transactions/date=</span><span class="kw2">{ds}</span><span class="str">/"</span>,
+    ]
+    <span class="kw">for</span> prefix <span class="kw">in</span> prefixes:
+        resp = s3.list_objects_v2(Bucket=BUCKET, Prefix=prefix, MaxKeys=<span class="num">1</span>)
+        <span class="kw">if</span> resp.get(<span class="str">"KeyCount"</span>, <span class="num">0</span>) == <span class="num">0</span>:
+            <span class="kw">return</span> <span class="str">"handle_missing_data"</span>
+    <span class="kw">return</span> <span class="str">"crawl_bronze"</span>
+
+<span class="cmt"># ── DAG Definition ────────────────────────────────────────</span>
+<span class="kw">with</span> DAG(
+    dag_id=<span class="str">"project2_master_pipeline"</span>,
+    schedule_interval=<span class="str">"0 2 * * *"</span>,    <span class="cmt"># 2AM UTC daily</span>
+    max_active_runs=<span class="num">1</span>,
+    tags=[<span class="str">"project2"</span>, <span class="str">"ecommerce"</span>, <span class="str">"financial"</span>],
+) <span class="kw">as</span> dag:
+
+    start = EmptyOperator(task_id=<span class="str">"start"</span>)
+
+    gate = BranchPythonOperator(
+        task_id=<span class="str">"check_bronze_data"</span>,
+        python_callable=check_bronze_data_arrived,
+    )
+
+    <span class="cmt"># Stage 1: Glue crawlers update schema catalog</span>
+    <span class="kw">with</span> TaskGroup(<span class="str">"crawl_bronze"</span>) <span class="kw">as</span> tg_crawl:
+        crawl_orders = GlueCrawlerOperator(task_id=<span class="str">"crawl_orders"</span>, ...)
+        crawl_txns   = GlueCrawlerOperator(task_id=<span class="str">"crawl_transactions"</span>, ...)
+
+    <span class="cmt"># Stage 2: Databricks bronze → silver (3 notebooks in parallel)</span>
+    <span class="kw">with</span> TaskGroup(<span class="str">"transform_bronze_to_silver"</span>) <span class="kw">as</span> tg_spark:
+        spark_orders = DatabricksRunNowOperator(
+            task_id=<span class="str">"spark_orders_silver"</span>,
+            job_id=DATABRICKS_JOB_BRONZE_TO_SILVER,
+            notebook_params={<span class="str">"source_table"</span>: <span class="str">"orders"</span>, <span class="str">"execution_date"</span>: <span class="str">"{{ ds }}"</span>},
+        )
+        spark_txns = DatabricksRunNowOperator(task_id=<span class="str">"spark_transactions_silver"</span>, ...)
+        spark_custs = DatabricksRunNowOperator(task_id=<span class="str">"spark_customers_silver"</span>, ...)
+
+    <span class="cmt"># Stage 3: Entity resolution using Spark ML + GraphFrames</span>
+    entity_resolution = DatabricksRunNowOperator(
+        task_id=<span class="str">"entity_resolution"</span>,
+        job_id=DATABRICKS_JOB_ENTITY_RESOLUTION,
+    )
+
+    <span class="cmt"># Stage 4: dbt builds gold marts in Redshift</span>
+    <span class="kw">with</span> TaskGroup(<span class="str">"dbt_gold_layer"</span>) <span class="kw">as</span> tg_dbt:
+        dbt_run  = PythonOperator(task_id=<span class="str">"dbt_run"</span>,  python_callable=run_dbt_models)
+        dbt_test = PythonOperator(task_id=<span class="str">"dbt_test"</span>, python_callable=run_dbt_tests)
+        dbt_run >> dbt_test
+
+    <span class="cmt"># Stage 5: Sync gold to Snowflake</span>
+    snowflake_sync = SnowflakeOperator(
+        task_id=<span class="str">"sync_gold_to_snowflake"</span>,
+        sql=<span class="str">"COPY INTO gold.daily_order_summary FROM @project2_stage/gold/..."</span>,
+    )
+
+    <span class="cmt"># Stage 6: Refresh Neo4j knowledge graph</span>
+    neo4j_refresh = PythonOperator(
+        task_id=<span class="str">"refresh_neo4j_graph"</span>,
+        python_callable=refresh_neo4j_graph,
+    )
+
+    <span class="cmt"># ── Dependency chain ──────────────────────────────────────</span>
+    start >> gate >> [tg_crawl, abort]
+    tg_crawl >> tg_spark >> entity_resolution
+    entity_resolution >> tg_dbt
+    tg_dbt >> [snowflake_sync, neo4j_refresh] >> summary >> end`
+  },
+
+  orders_nb: {
+    id: 'orders_nb',
+    name: 'orders_bronze_to_silver.py',
+    path: ['databricks', 'notebooks', 'orders_bronze_to_silver.py'],
+    lang: 'PySpark',
+    icon: '🔥',
+    section: 'Databricks',
+    code: `<span class="cmt"># databricks/notebooks/orders_bronze_to_silver.py</span>
+<span class="cmt"># 8-step pipeline: bronze → validated silver Delta table</span>
+
+<span class="kw">from</span> <span class="imp">pyspark.sql</span> <span class="kw">import</span> functions <span class="kw">as</span> F
+<span class="kw">from</span> <span class="imp">pyspark.sql.window</span> <span class="kw">import</span> Window
+<span class="kw">from</span> <span class="imp">delta.tables</span> <span class="kw">import</span> DeltaTable
+
+<span class="cmt"># Airflow passes these as notebook parameters</span>
+EXECUTION_DATE = dbutils.widgets.get(<span class="str">"execution_date"</span>)
+S3_BUCKET      = dbutils.widgets.get(<span class="str">"s3_bucket"</span>)
+BRONZE_PATH    = <span class="str">f"s3://</span><span class="kw2">{S3_BUCKET}</span><span class="str">/bronze/ecommerce/orders/date=</span><span class="kw2">{EXECUTION_DATE}</span><span class="str">/"</span>
+SILVER_PATH    = <span class="str">f"s3://</span><span class="kw2">{S3_BUCKET}</span><span class="str">/silver/ecommerce/orders/"</span>
+
+<span class="cmt"># Step 1: Explicit schema — never infer in production</span>
+BRONZE_SCHEMA = StructType([
+    StructField(<span class="str">"order_id"</span>,     StringType(), nullable=<span class="kw2">False</span>),
+    StructField(<span class="str">"customer_id"</span>,  StringType(), nullable=<span class="kw2">False</span>),
+    StructField(<span class="str">"gross_amount"</span>, StringType(), nullable=<span class="kw2">True</span>),  <span class="cmt"># raw string</span>
+    <span class="cmt"># ... 10 more fields</span>
+])
+
+<span class="cmt"># Step 2: Read bronze with bad records quarantined</span>
+df_raw = (
+    spark.read
+    .schema(BRONZE_SCHEMA)
+    .option(<span class="str">"badRecordsPath"</span>, BAD_PATH)   <span class="cmt"># don't crash on bad rows</span>
+    .option(<span class="str">"mode"</span>, <span class="str">"PERMISSIVE"</span>)
+    .parquet(BRONZE_PATH)
+)
+
+<span class="cmt"># Step 3: Type casting + derived columns</span>
+df_enriched = (
+    df_raw
+    .withColumn(<span class="str">"gross_amount"</span>, F.col(<span class="str">"gross_amount"</span>).cast(DoubleType()))
+    .withColumn(<span class="str">"order_ts"</span>, F.to_timestamp(<span class="str">"order_ts"</span>, <span class="str">"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"</span>))
+    .withColumn(<span class="str">"net_amount"</span>,
+        F.round(F.col(<span class="str">"gross_amount"</span>) - F.coalesce(F.col(<span class="str">"discount_amount"</span>), F.lit(<span class="num">0.0</span>)), <span class="num">2</span>))
+    .withColumn(<span class="str">"is_weekend"</span>, F.dayofweek(<span class="str">"order_ts"</span>).isin(<span class="num">1</span>, <span class="num">7</span>))
+    .withColumn(<span class="str">"discount_pct"</span>,
+        F.round(F.col(<span class="str">"discount_amount"</span>) / F.col(<span class="str">"gross_amount"</span>) * <span class="num">100</span>, <span class="num">2</span>))
+)
+
+<span class="cmt"># Step 4: Validation bitmask — flag errors, don't lose data</span>
+df_validated = (
+    df_enriched
+    .withColumn(<span class="str">"_err_null_order_id"</span>,   F.col(<span class="str">"order_id"</span>).isNull())
+    .withColumn(<span class="str">"_err_negative_amount"</span>, F.col(<span class="str">"gross_amount"</span>) &lt; <span class="num">0</span>)
+    .withColumn(<span class="str">"_err_invalid_status"</span>,
+        ~F.col(<span class="str">"order_status"</span>).isin([<span class="str">"pending"</span>,<span class="str">"confirmed"</span>,<span class="str">"shipped"</span>,<span class="str">"delivered"</span>]))
+    .withColumn(<span class="str">"_err_future_order"</span>,
+        F.col(<span class="str">"order_ts"</span>) > F.current_timestamp() + F.expr(<span class="str">"INTERVAL 1 HOUR"</span>))
+)
+
+<span class="cmt"># Step 5: Split clean vs quarantine</span>
+df_clean     = df_validated.filter(<span class="str">"_is_valid = true"</span>)
+df_quarantine = df_validated.filter(<span class="str">"_is_valid = false"</span>)
+df_quarantine.write.mode(<span class="str">"overwrite"</span>).parquet(BAD_PATH)
+
+<span class="cmt"># Step 6: Deduplication — keep latest updated_ts per order_id</span>
+dedup_window = Window.partitionBy(<span class="str">"order_id"</span>).orderBy(F.col(<span class="str">"updated_ts"</span>).desc_nulls_last())
+df_deduped = (
+    df_clean
+    .withColumn(<span class="str">"_row_num"</span>, F.row_number().over(dedup_window))
+    .filter(F.col(<span class="str">"_row_num"</span>) == <span class="num">1</span>)
+    .drop(<span class="str">"_row_num"</span>, <span class="str">"_is_valid"</span>)
+)
+
+<span class="cmt"># Step 7: MERGE upsert into Delta Lake — idempotent reruns</span>
+<span class="kw">if</span> DeltaTable.isDeltaTable(spark, SILVER_PATH):
+    silver_table = DeltaTable.forPath(spark, SILVER_PATH)
+    (silver_table.alias(<span class="str">"existing"</span>)
+     .merge(df_deduped.alias(<span class="str">"new"</span>), <span class="str">"existing.order_id = new.order_id"</span>)
+     .whenMatchedUpdateAll()
+     .whenNotMatchedInsertAll()
+     .execute())
+<span class="kw">else</span>:
+    df_deduped.write.format(<span class="str">"delta"</span>).partitionBy(<span class="str">"order_year"</span>, <span class="str">"order_month"</span>).save(SILVER_PATH)
+
+<span class="cmt"># Step 8: Optimise — co-locate related data on disk</span>
+spark.sql(<span class="str">f"OPTIMIZE delta.\`{SILVER_PATH}\` ZORDER BY (customer_id, order_ts)"</span>)
+dbutils.notebook.exit(str(metrics))`
+  },
+
+  transactions_nb: {
+    id: 'transactions_nb',
+    name: 'transactions_bronze_to_silver.py',
+    path: ['databricks', 'notebooks', 'transactions_bronze_to_silver.py'],
+    lang: 'PySpark',
+    icon: '🔥',
+    section: 'Databricks',
+    code: `<span class="cmt"># databricks/notebooks/transactions_bronze_to_silver.py</span>
+<span class="cmt"># Same 8-step pattern as orders + fraud signal computation</span>
+
+<span class="cmt"># ── Fraud signal computation (Step 3 addition) ────────────</span>
+
+<span class="cmt"># Velocity: how many txns in last hour per customer?</span>
+velocity_window = (
+    Window
+    .partitionBy(<span class="str">"customer_id"</span>)
+    .orderBy(F.col(<span class="str">"transaction_ts"</span>).cast(<span class="str">"long"</span>))
+    .rangeBetween(-<span class="num">3600</span>, <span class="num">0</span>)   <span class="cmt"># 1 hour in seconds</span>
+)
+
+<span class="cmt"># Customer spend baseline from last 30 days of silver history</span>
+df_history = (
+    spark.read.format(<span class="str">"delta"</span>).load(SILVER_PATH)
+    .filter(F.col(<span class="str">"transaction_ts"</span>) >= lookback_start)
+    .groupBy(<span class="str">"customer_id"</span>)
+    .agg(
+        F.avg(<span class="str">"amount"</span>).alias(<span class="str">"avg_amount_30d"</span>),
+        F.stddev(<span class="str">"amount"</span>).alias(<span class="str">"stddev_amount_30d"</span>),
+        F.count(<span class="str">"*"</span>).alias(<span class="str">"txn_count_30d"</span>),
+    )
+)
+
+<span class="cmt"># Flag signals — these feed the fraud model in Phase 6</span>
+df_flagged = (
+    df_with_history
+    .withColumn(<span class="str">"txn_velocity_1h"</span>,
+        F.count(<span class="str">"transaction_id"</span>).over(velocity_window))
+    .withColumn(<span class="str">"flag_high_value"</span>,
+        F.col(<span class="str">"amount"</span>) > <span class="num">5000</span>)
+    .withColumn(<span class="str">"flag_velocity_spike"</span>,
+        F.col(<span class="str">"txn_velocity_1h"</span>) > <span class="num">5</span>)
+    .withColumn(<span class="str">"flag_amount_anomaly"</span>,
+        <span class="cmt"># More than 3 standard deviations from 30-day baseline</span>
+        F.when(F.col(<span class="str">"stddev_amount_30d"</span>).isNotNull(),
+            F.abs(F.col(<span class="str">"amount"</span>) - F.col(<span class="str">"avg_amount_30d"</span>))
+            > (<span class="num">3</span> * F.col(<span class="str">"stddev_amount_30d"</span>))
+        ).otherwise(F.lit(<span class="kw2">False</span>)))
+    .withColumn(<span class="str">"flag_intl_high_value"</span>,
+        F.col(<span class="str">"is_international"</span>) &amp; (F.col(<span class="str">"amount"</span>) > <span class="num">1000</span>))
+    <span class="cmt"># Composite risk score (weights assigned per signal severity)</span>
+    .withColumn(<span class="str">"risk_score"</span>,
+        (F.col(<span class="str">"flag_high_value"</span>).cast(<span class="str">"int"</span>) * <span class="num">2</span>) +
+        (F.col(<span class="str">"flag_velocity_spike"</span>).cast(<span class="str">"int"</span>) * <span class="num">3</span>) +
+        (F.col(<span class="str">"flag_amount_anomaly"</span>).cast(<span class="str">"int"</span>) * <span class="num">3</span>) +
+        (F.col(<span class="str">"flag_intl_high_value"</span>).cast(<span class="str">"int"</span>) * <span class="num">2</span>))
+    .withColumn(<span class="str">"risk_tier"</span>,
+        F.when(F.col(<span class="str">"risk_score"</span>) >= <span class="num">6</span>, <span class="str">"HIGH"</span>)
+        .when(F.col(<span class="str">"risk_score"</span>) >= <span class="num">3</span>, <span class="str">"MEDIUM"</span>)
+        .otherwise(<span class="str">"LOW"</span>))
+)
+
+<span class="cmt"># Transactions are immutable — MERGE only inserts, never updates</span>
+(silver_table.alias(<span class="str">"existing"</span>)
+ .merge(df_silver.alias(<span class="str">"new"</span>), <span class="str">"existing.transaction_id = new.transaction_id"</span>)
+ .whenNotMatchedInsertAll()   <span class="cmt"># insert only — financial records never overwritten</span>
+ .execute())`
+  },
+
+  entity_res: {
+    id: 'entity_res',
+    name: 'entity_resolution.py',
+    path: ['databricks', 'notebooks', 'entity_resolution.py'],
+    lang: 'PySpark + GraphFrames',
+    icon: '🧬',
+    section: 'Databricks',
+    code: `<span class="cmt"># databricks/notebooks/entity_resolution.py</span>
+<span class="cmt"># Links customer records across source systems using</span>
+<span class="cmt"># blocking → feature engineering → GraphFrames connected components</span>
+
+<span class="kw">from</span> <span class="imp">graphframes</span> <span class="kw">import</span> GraphFrame
+
+<span class="cmt"># ── Step 1: Blocking — reduce O(n²) to ~millions ─────────</span>
+<span class="cmt"># Without blocking: 1M customers → 500 BILLION pairs</span>
+<span class="cmt"># With blocking:    1M customers → ~2 MILLION candidate pairs</span>
+
+<span class="cmt"># Block key 1: first 3 chars of last name + postal code</span>
+pairs_bk1 = (
+    df_customers.alias(<span class="str">"a"</span>)
+    .join(df_customers.alias(<span class="str">"b"</span>),
+        (F.col(<span class="str">"a.block_key_1"</span>) == F.col(<span class="str">"b.block_key_1"</span>)) &amp;
+        (F.col(<span class="str">"a.customer_id"</span>) &lt; F.col(<span class="str">"b.customer_id"</span>)) &amp;  <span class="cmt"># avoid duplicates</span>
+        (F.col(<span class="str">"a.source_system"</span>) != F.col(<span class="str">"b.source_system"</span>)),  <span class="cmt"># cross-system only</span>
+        <span class="str">"inner"</span>)
+    .select(F.col(<span class="str">"a.customer_id"</span>).alias(<span class="str">"id_a"</span>),
+            F.col(<span class="str">"b.customer_id"</span>).alias(<span class="str">"id_b"</span>),
+            F.lit(<span class="str">"block_key_1"</span>).alias(<span class="str">"block_source"</span>))
+)
+<span class="cmt"># Block key 2: exact email (strongest signal)</span>
+<span class="cmt"># Block key 3: normalised phone</span>
+candidate_pairs = pairs_bk1.union(pairs_bk2).union(pairs_bk3).dropDuplicates()
+
+<span class="cmt"># ── Step 2: Feature engineering ──────────────────────────</span>
+<span class="dec">@F.udf</span>(<span class="str">"double"</span>)
+<span class="kw">def</span> <span class="fn">jaro_winkler</span>(s1, s2):
+    <span class="kw">import</span> <span class="imp">jellyfish</span>
+    <span class="kw">return</span> jellyfish.jaro_winkler_similarity(s1, s2)  <span class="cmt"># tolerates typos</span>
+
+df_features = (
+    pairs_with_data
+    .withColumn(<span class="str">"email_exact_match"</span>,   F.col(<span class="str">"email_a"</span>) == F.col(<span class="str">"email_b"</span>))
+    .withColumn(<span class="str">"phone_exact_match"</span>,   F.col(<span class="str">"phone_a"</span>) == F.col(<span class="str">"phone_b"</span>))
+    .withColumn(<span class="str">"soundex_match"</span>,        F.col(<span class="str">"soundex_a"</span>) == F.col(<span class="str">"soundex_b"</span>))
+    .withColumn(<span class="str">"name_similarity"</span>,      jaro_winkler(F.col(<span class="str">"name_a"</span>), F.col(<span class="str">"name_b"</span>)))
+    .withColumn(<span class="str">"age_within_2"</span>,         F.abs(F.col(<span class="str">"age_a"</span>) - F.col(<span class="str">"age_b"</span>)) &lt;= <span class="num">2</span>)
+    .withColumn(<span class="str">"rule_score"</span>,
+        (F.col(<span class="str">"email_exact_match"</span>).cast(<span class="str">"int"</span>) * <span class="num">5</span>) +
+        (F.col(<span class="str">"phone_exact_match"</span>).cast(<span class="str">"int"</span>) * <span class="num">4</span>) +
+        (F.col(<span class="str">"soundex_match"</span>).cast(<span class="str">"int"</span>) * <span class="num">2</span>) +
+        (F.col(<span class="str">"name_similarity"</span>) * <span class="num">3</span>))
+    .withColumn(<span class="str">"match_probability"</span>, F.col(<span class="str">"rule_score"</span>) / MAX_SCORE)
+)
+
+<span class="cmt"># ── Step 3: GraphFrames connected components ─────────────</span>
+<span class="cmt"># If A=B and B=C → A, B, C are the same entity</span>
+<span class="cmt"># SQL cannot express this transitively at scale</span>
+vertices = df_customers.select(F.col(<span class="str">"customer_id"</span>).alias(<span class="str">"id"</span>)).distinct()
+edges    = df_matches.select(
+    F.col(<span class="str">"id_a"</span>).alias(<span class="str">"src"</span>),
+    F.col(<span class="str">"id_b"</span>).alias(<span class="str">"dst"</span>),
+)
+
+graph      = GraphFrame(vertices, edges)
+components = graph.connectedComponents()
+<span class="cmt"># Each cluster gets a resolved_entity_id = min customer_id in cluster</span>
+
+df_resolved = (
+    components
+    .withColumn(<span class="str">"resolved_entity_id"</span>,
+        F.concat(F.lit(<span class="str">"ent_"</span>), F.col(<span class="str">"component"</span>).cast(<span class="str">"string"</span>)))
+    .withColumnRenamed(<span class="str">"id"</span>, <span class="str">"customer_id"</span>)
+)
+
+<span class="cmt"># Write back resolved IDs to silver customer table</span>
+silver_table = DeltaTable.forPath(spark, SILVER_CUSTOMERS)
+(silver_table.alias(<span class="str">"silver"</span>)
+ .merge(df_resolved.alias(<span class="str">"er"</span>), <span class="str">"silver.customer_id = er.customer_id"</span>)
+ .whenMatchedUpdate(set={<span class="str">"resolved_entity_id"</span>: <span class="str">"er.resolved_entity_id"</span>})
+ .execute())`
+  },
+
+  dbt_customer: {
+    id: 'dbt_customer',
+    name: 'mart_customer_360.sql',
+    path: ['dbt', 'models', 'marts', 'mart_customer_360.sql'],
+    lang: 'SQL (dbt)',
+    icon: '🏗️',
+    section: 'dbt',
+    code: `<span class="cmt">-- dbt/models/marts/mart_customer_360.sql</span>
+<span class="cmt">-- The crown jewel mart: one row per customer</span>
+<span class="cmt">-- Joins profile + order metrics + transaction metrics + LTV + risk</span>
+
+<span class="kw2">{{</span>
+    config(
+        materialized = <span class="str">'table'</span>,
+        dist         = <span class="str">'customer_id'</span>,
+        sort         = [<span class="str">'customer_id'</span>],
+        tags         = [<span class="str">'gold'</span>, <span class="str">'customer'</span>]
+    )
+<span class="kw2">}}</span>
+
+<span class="kw">with</span> customers <span class="kw">as</span> (
+    <span class="kw">select</span> * <span class="kw">from</span> <span class="kw2">{{ ref('stg_customers') }}</span>
+),
+
+order_metrics <span class="kw">as</span> (
+    <span class="kw">select</span> * <span class="kw">from</span> <span class="kw2">{{ ref('int_customer_order_metrics') }}</span>
+),
+
+txn_metrics <span class="kw">as</span> (
+    <span class="kw">select</span> * <span class="kw">from</span> <span class="kw2">{{ ref('int_customer_transaction_metrics') }}</span>
+),
+
+final <span class="kw">as</span> (
+    <span class="kw">select</span>
+        <span class="cmt">-- Identity (from entity resolution)</span>
+        c.customer_id,
+        c.resolved_entity_id,
+        c.customer_name,
+        c.email,
+
+        <span class="cmt">-- Profile</span>
+        c.country,
+        c.segment,
+        c.loyalty_tier,
+        c.is_active,
+
+        <span class="cmt">-- Order metrics (from int_customer_order_metrics)</span>
+        coalesce(o.total_orders, <span class="num">0</span>)          <span class="kw">as</span> total_orders,
+        coalesce(o.total_revenue, <span class="num">0</span>)         <span class="kw">as</span> total_order_revenue,
+        coalesce(o.avg_order_value, <span class="num">0</span>)       <span class="kw">as</span> avg_order_value,
+        coalesce(o.revenue_last_30d, <span class="num">0</span>)      <span class="kw">as</span> revenue_last_30d,
+        coalesce(o.cancellation_rate_pct, <span class="num">0</span>) <span class="kw">as</span> cancellation_rate_pct,
+
+        <span class="cmt">-- Transaction metrics + LTV (from int_customer_transaction_metrics)</span>
+        coalesce(t.net_txn_revenue, <span class="num">0</span>)       <span class="kw">as</span> net_txn_revenue,
+        coalesce(t.estimated_ltv, <span class="num">0</span>)         <span class="kw">as</span> estimated_ltv,
+        coalesce(t.total_risk_score, <span class="num">0</span>)      <span class="kw">as</span> total_risk_score,
+        coalesce(t.high_risk_txn_count, <span class="num">0</span>)   <span class="kw">as</span> high_risk_txn_count,
+
+        <span class="cmt">-- LTV tier classification</span>
+        <span class="kw">case</span>
+            <span class="kw">when</span> coalesce(t.estimated_ltv, <span class="num">0</span>) >= <span class="num">10000</span> <span class="kw">then</span> <span class="str">'platinum'</span>
+            <span class="kw">when</span> coalesce(t.estimated_ltv, <span class="num">0</span>) >= <span class="num">5000</span>  <span class="kw">then</span> <span class="str">'gold'</span>
+            <span class="kw">when</span> coalesce(t.estimated_ltv, <span class="num">0</span>) >= <span class="num">1000</span>  <span class="kw">then</span> <span class="str">'silver'</span>
+            <span class="kw">when</span> coalesce(t.estimated_ltv, <span class="num">0</span>) >= <span class="num">100</span>   <span class="kw">then</span> <span class="str">'bronze'</span>
+            <span class="kw">else</span> <span class="str">'new'</span>
+        <span class="kw">end</span>                                   <span class="kw">as</span> ltv_tier,
+
+        <span class="cmt">-- Churn risk (rule-based, upgraded to ML in Phase 6)</span>
+        <span class="kw">case</span>
+            <span class="kw">when</span> coalesce(o.orders_last_30d, <span class="num">0</span>) = <span class="num">0</span>
+             <span class="kw">and</span> coalesce(o.total_orders, <span class="num">0</span>) > <span class="num">3</span>    <span class="kw">then</span> <span class="str">'at_risk'</span>
+            <span class="kw">when</span> o.last_order_ts &lt; dateadd(<span class="str">'day'</span>, -<span class="num">90</span>, current_timestamp) <span class="kw">then</span> <span class="str">'churned'</span>
+            <span class="kw">when</span> coalesce(o.orders_per_month, <span class="num">0</span>) >= <span class="num">2</span> <span class="kw">then</span> <span class="str">'loyal'</span>
+            <span class="kw">else</span> <span class="str">'active'</span>
+        <span class="kw">end</span>                                   <span class="kw">as</span> churn_status
+
+    <span class="kw">from</span> customers c
+    <span class="kw">left join</span> order_metrics o <span class="kw">on</span> c.customer_id = o.customer_id
+    <span class="kw">left join</span> txn_metrics   t <span class="kw">on</span> c.customer_id = t.customer_id
+)
+
+<span class="kw">select</span> * <span class="kw">from</span> final`
+  },
+
+  kinesis_producer: {
+    id: 'kinesis_producer',
+    name: 'producer.py',
+    path: ['ingestion', 'kinesis', 'producer.py'],
+    lang: 'Python',
+    icon: '⚡',
+    section: 'Kinesis',
+    code: `<span class="cmt"># ingestion/kinesis/producer.py</span>
+<span class="cmt"># Sends events to 3 Kinesis streams in batches of 500</span>
+<span class="cmt"># Handles retries on individual record failures</span>
+
+<span class="kw">import</span> <span class="imp">boto3</span>
+<span class="kw">from</span> <span class="imp">tenacity</span> <span class="kw">import</span> retry, stop_after_attempt, wait_exponential
+
+STREAMS = {
+    <span class="str">"orders"</span>:       <span class="str">"project2-orders-stream"</span>,
+    <span class="str">"transactions"</span>: <span class="str">"project2-transactions-stream"</span>,
+    <span class="str">"clickstream"</span>:  <span class="str">"project2-clickstream-stream"</span>,
+}
+
+<span class="kw">class</span> <span class="cls">KinesisProducer</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, region=<span class="str">"us-east-1"</span>):
+        self.client = boto3.client(<span class="str">"kinesis"</span>, region_name=region)
+
+    <span class="dec">@retry</span>(stop=stop_after_attempt(<span class="num">3</span>), wait=wait_exponential(min=<span class="num">2</span>, max=<span class="num">10</span>))
+    <span class="kw">def</span> <span class="fn">_put_records_batch</span>(self, stream_name, records):
+        <span class="kw">return</span> self.client.put_records(StreamName=stream_name, Records=records)
+
+    <span class="kw">def</span> <span class="fn">send_events</span>(self, stream_name, events):
+        <span class="kw">for</span> i <span class="kw">in</span> range(<span class="num">0</span>, len(events), <span class="num">500</span>):   <span class="cmt"># Kinesis max batch = 500</span>
+            batch = events[i : i + <span class="num">500</span>]
+            records = [{
+                <span class="str">"Data"</span>:         json.dumps(e).encode(),
+                <span class="str">"PartitionKey"</span>: e.get(<span class="str">"customer_id"</span>),  <span class="cmt"># same customer → same shard</span>
+            } <span class="kw">for</span> e <span class="kw">in</span> batch]
+
+            response = self._put_records_batch(stream_name, records)
+
+            <span class="cmt"># Retry individual failed records within the batch</span>
+            <span class="kw">if</span> response[<span class="str">"FailedRecordCount"</span>] > <span class="num">0</span>:
+                <span class="kw">for</span> j, record <span class="kw">in</span> enumerate(response[<span class="str">"Records"</span>]):
+                    <span class="kw">if</span> <span class="str">"ErrorCode"</span> <span class="kw">in</span> record:
+                        self.client.put_record(
+                            StreamName=stream_name,
+                            Data=records[j][<span class="str">"Data"</span>],
+                            PartitionKey=records[j][<span class="str">"PartitionKey"</span>],
+                        )
+
+<span class="cmt"># ── Synthetic event generators for simulation/testing ─────</span>
+<span class="kw">def</span> <span class="fn">generate_order_event</span>():
+    gross = round(random.uniform(<span class="num">10</span>, <span class="num">2000</span>), <span class="num">2</span>)
+    <span class="kw">return</span> {
+        <span class="str">"event_type"</span>:   <span class="str">"order"</span>,
+        <span class="str">"order_id"</span>:     <span class="str">f"ord_{uuid.uuid4().hex[:12]}"</span>,
+        <span class="str">"customer_id"</span>:  <span class="str">f"cust_{random.randint(1000, 9999)}"</span>,
+        <span class="str">"gross_amount"</span>: gross,
+        <span class="str">"order_ts"</span>:     datetime.now(timezone.utc).isoformat(),
+        <span class="str">"currency"</span>:     random.choice([<span class="str">"USD"</span>,<span class="str">"EUR"</span>,<span class="str">"GBP"</span>]),
+        <span class="str">"order_status"</span>: <span class="str">"confirmed"</span>,
+        <span class="str">"source_system"</span>:<span class="str">"ecommerce_app"</span>,
+    }
+
+<span class="cmt"># Run simulation: python producer.py --stream orders --simulate --count 1000</span>`
+  },
+
+  lambda_trigger: {
+    id: 'lambda_trigger',
+    name: 's3_trigger.py',
+    path: ['ingestion', 'lambda', 's3_trigger.py'],
+    lang: 'Python (Lambda)',
+    icon: '𝜆',
+    section: 'Lambda',
+    code: `<span class="cmt"># ingestion/lambda/s3_trigger.py</span>
+<span class="cmt"># Fires on every S3 PUT to bronze/*.parquet</span>
+<span class="cmt"># Checks DynamoDB for idempotency, triggers Airflow DAG</span>
+
+<span class="kw">def</span> <span class="fn">parse_s3_key</span>(bucket, key):
+    <span class="cmt"># Extract domain + date from S3 path</span>
+    <span class="cmt"># bronze/ecommerce/orders/date=2025-01-15/hour=03/file.parquet</span>
+    date_match   = re.search(<span class="str">r"date=(\d{4}-\d{2}-\d{2})"</span>, key)
+    execution_date = date_match.group(<span class="num">1</span>) <span class="kw">if</span> date_match <span class="kw">else</span> <span class="kw2">None</span>
+
+    domain = <span class="kw2">None</span>
+    <span class="kw">for</span> prefix, name <span class="kw">in</span> PREFIX_TO_DOMAIN.items():
+        <span class="kw">if</span> key.startswith(prefix):
+            domain = name; <span class="kw">break</span>
+
+    <span class="kw">return</span> {<span class="str">"execution_date"</span>: execution_date, <span class="str">"domain"</span>: domain}
+
+<span class="kw">def</span> <span class="fn">is_already_processed</span>(execution_date, domain):
+    <span class="cmt"># DynamoDB as idempotency lock table</span>
+    <span class="cmt"># Prevents triggering same DAG run twice for same date+domain</span>
+    table = dynamo.Table(DYNAMO_TABLE)
+    resp  = table.get_item(Key={
+        <span class="str">"pk"</span>: <span class="str">f"PIPELINE#</span><span class="kw2">{execution_date}</span><span class="str">"</span>,
+        <span class="str">"sk"</span>: <span class="str">f"DOMAIN#</span><span class="kw2">{domain}</span><span class="str">"</span>
+    })
+    <span class="kw">return</span> resp.get(<span class="str">"Item"</span>, {}).get(<span class="str">"status"</span>) == <span class="str">"TRIGGERED"</span>
+
+<span class="kw">def</span> <span class="fn">trigger_airflow_dag</span>(execution_date, domain, s3_key):
+    <span class="cmt"># POST to Airflow REST API to start the pipeline DAG</span>
+    dag_run_id = <span class="str">f"lambda_trigger_{execution_date}_{domain}"</span>
+    payload = json.dumps({
+        <span class="str">"dag_run_id"</span>: dag_run_id,
+        <span class="str">"conf"</span>: {
+            <span class="str">"execution_date"</span>: execution_date,
+            <span class="str">"domain"</span>:         domain,
+            <span class="str">"triggered_by"</span>:   <span class="str">"lambda_s3_trigger"</span>,
+        }
+    }).encode()
+
+    req = urllib.request.Request(
+        url=<span class="str">f"{AIRFLOW_BASE_URL}/api/v1/dags/project2_master_pipeline/dagRuns"</span>,
+        data=payload,
+        headers={<span class="str">"Authorization"</span>: <span class="str">f"Basic {credentials}"</span>},
+        method=<span class="str">"POST"</span>,
+    )
+    urllib.request.urlopen(req, timeout=<span class="num">10</span>)
+    <span class="kw">return</span> dag_run_id
+
+<span class="kw">def</span> <span class="fn">handler</span>(event, context):
+    <span class="cmt"># Lambda entry point — called by S3 event notification</span>
+    <span class="kw">for</span> record <span class="kw">in</span> event.get(<span class="str">"Records"</span>, []):
+        bucket = record[<span class="str">"s3"</span>][<span class="str">"bucket"</span>][<span class="str">"name"</span>]
+        key    = record[<span class="str">"s3"</span>][<span class="str">"object"</span>][<span class="str">"key"</span>]
+        size   = record[<span class="str">"s3"</span>][<span class="str">"object"</span>].get(<span class="str">"size"</span>, <span class="num">0</span>)
+
+        <span class="kw">if</span> size &lt; MIN_FILE_SIZE_BYTES: <span class="kw">continue</span>  <span class="cmt"># skip tiny/empty files</span>
+        meta = parse_s3_key(bucket, key)
+        <span class="kw">if</span> is_already_processed(meta[<span class="str">"execution_date"</span>], meta[<span class="str">"domain"</span>]):
+            <span class="kw">continue</span>  <span class="cmt"># idempotency check — don't run twice</span>
+
+        dag_run_id = trigger_airflow_dag(
+            meta[<span class="str">"execution_date"</span>], meta[<span class="str">"domain"</span>], key)
+        mark_as_triggered(meta[<span class="str">"execution_date"</span>], meta[<span class="str">"domain"</span>], dag_run_id)`
+  },
+
+  neo4j_schema: {
+    id: 'neo4j_schema',
+    name: '01_schema.cypher',
+    path: ['neo4j', 'queries', '01_schema.cypher'],
+    lang: 'Cypher',
+    icon: '🕸️',
+    section: 'Neo4j',
+    code: `<span class="cmt">// neo4j/queries/01_schema.cypher</span>
+<span class="cmt">// Graph model: Customer → Order → Merchant</span>
+<span class="cmt">//              Customer → Transaction → Merchant</span>
+<span class="cmt">//              Customer -[SAME_AS]- Customer (entity resolution)</span>
+
+<span class="cmt">// ── Constraints ───────────────────────────────────────────</span>
+<span class="kw">CREATE CONSTRAINT</span> customer_id <span class="kw">IF NOT EXISTS</span>
+    <span class="kw">FOR</span> (c:Customer) <span class="kw">REQUIRE</span> c.customer_id <span class="kw">IS UNIQUE</span>;
+
+<span class="kw">CREATE CONSTRAINT</span> order_id <span class="kw">IF NOT EXISTS</span>
+    <span class="kw">FOR</span> (o:Order) <span class="kw">REQUIRE</span> o.order_id <span class="kw">IS UNIQUE</span>;
+
+<span class="kw">CREATE CONSTRAINT</span> transaction_id <span class="kw">IF NOT EXISTS</span>
+    <span class="kw">FOR</span> (t:Transaction) <span class="kw">REQUIRE</span> t.transaction_id <span class="kw">IS UNIQUE</span>;
+
+<span class="cmt">// ── Indexes for common query patterns ─────────────────────</span>
+<span class="kw">CREATE INDEX</span> customer_email <span class="kw">IF NOT EXISTS</span>
+    <span class="kw">FOR</span> (c:Customer) <span class="kw">ON</span> (c.email_normalised);
+
+<span class="kw">CREATE INDEX</span> transaction_risk <span class="kw">IF NOT EXISTS</span>
+    <span class="kw">FOR</span> (t:Transaction) <span class="kw">ON</span> (t.risk_tier, t.txn_date);
+
+<span class="cmt">// ── Key analytics queries ─────────────────────────────────</span>
+
+<span class="cmt">// Customer 360 graph context</span>
+<span class="kw">MATCH</span> (c:Customer {customer_id: $customer_id})
+<span class="kw">OPTIONAL MATCH</span> (c)-[<span class="kw">:PLACED</span>]->(o:Order)
+<span class="kw">OPTIONAL MATCH</span> (o)-[<span class="kw">:PAID_VIA</span>]->(m:Merchant)
+<span class="kw">OPTIONAL MATCH</span> (c)-[<span class="kw">:MADE</span>]->(t:Transaction)
+<span class="kw">OPTIONAL MATCH</span> (c)-[<span class="kw">:SAME_AS</span>]-(twin:Customer)
+<span class="kw">RETURN</span>
+    c.customer_id,
+    <span class="fn">COUNT</span>(<span class="kw">DISTINCT</span> o) <span class="kw">AS</span> total_orders,
+    <span class="fn">SUM</span>(o.net_amount)  <span class="kw">AS</span> total_spend,
+    <span class="fn">COUNT</span>(<span class="kw">DISTINCT</span> m) <span class="kw">AS</span> distinct_merchants,
+    <span class="fn">COUNT</span>(<span class="kw">DISTINCT</span> twin) <span class="kw">AS</span> linked_profiles;
+
+<span class="cmt">// Fraud ring detection — customers sharing high-risk merchants</span>
+<span class="kw">MATCH</span> (c1:Customer)-[<span class="kw">:MADE</span>]->(t1:Transaction {risk_tier: <span class="str">'HIGH'</span>})
+      -[<span class="kw">:AT</span>]->(m:Merchant)
+      &lt;-[<span class="kw">:AT</span>]-(t2:Transaction {risk_tier: <span class="str">'HIGH'</span>})
+      &lt;-[<span class="kw">:MADE</span>]-(c2:Customer)
+<span class="kw">WHERE</span> c1 &lt;&gt; c2
+<span class="kw">WITH</span> c1, c2, m, <span class="fn">COUNT</span>(*) <span class="kw">AS</span> shared_high_risk_txns
+<span class="kw">WHERE</span> shared_high_risk_txns >= <span class="num">3</span>
+<span class="kw">RETURN</span> c1.customer_id, c2.customer_id,
+       m.merchant_id, shared_high_risk_txns
+<span class="kw">ORDER BY</span> shared_high_risk_txns <span class="kw">DESC</span>;
+
+<span class="cmt">// PageRank — find most influential customers (GDS library)</span>
+<span class="kw">CALL</span> gds.pageRank.stream(<span class="str">'customer-merchant-graph'</span>, {
+    maxIterations: <span class="num">20</span>, dampingFactor: <span class="num">0.85</span>
+})
+<span class="kw">YIELD</span> nodeId, score
+<span class="kw">MATCH</span> (c:Customer) <span class="kw">WHERE</span> id(c) = nodeId
+<span class="kw">RETURN</span> c.customer_id, score <span class="kw">AS</span> pagerank_score
+<span class="kw">ORDER BY</span> score <span class="kw">DESC LIMIT</span> <span class="num">50</span>;`
+  },
+
+  api_main: {
+    id: 'api_main',
+    name: 'main.py',
+    path: ['api', 'main.py'],
+    lang: 'Python (FastAPI)',
+    icon: '🚀',
+    section: 'FastAPI',
+    code: `<span class="cmt"># api/main.py</span>
+<span class="cmt"># FastAPI application — 5 routers exposing gold layer data</span>
+
+<span class="kw">from</span> <span class="imp">fastapi</span> <span class="kw">import</span> FastAPI
+<span class="kw">from</span> <span class="imp">fastapi.middleware.cors</span> <span class="kw">import</span> CORSMiddleware
+<span class="kw">from</span> <span class="imp">contextlib</span> <span class="kw">import</span> asynccontextmanager
+
+<span class="kw">from</span> <span class="imp">api.routers</span> <span class="kw">import</span> customers, orders, fraud, query, entities
+
+<span class="dec">@asynccontextmanager</span>
+<span class="kw">async def</span> <span class="fn">lifespan</span>(app):
+    log.info(<span class="str">"Starting Project 2 API..."</span>)
+    <span class="kw">yield</span>
+    log.info(<span class="str">"Shutting down..."</span>)
+
+app = FastAPI(
+    title=<span class="str">"Project 2 — Data Product API"</span>,
+    version=<span class="str">"2.0.0"</span>,
+    lifespan=lifespan,
+)
+
+<span class="cmt"># ── Routers — each handles one data domain ────────────────</span>
+app.include_router(customers.router, prefix=<span class="str">"/customers"</span>, tags=[<span class="str">"Customers"</span>])
+app.include_router(orders.router,    prefix=<span class="str">"/orders"</span>,    tags=[<span class="str">"Orders"</span>])
+app.include_router(fraud.router,     prefix=<span class="str">"/fraud"</span>,     tags=[<span class="str">"Fraud"</span>])
+app.include_router(query.router,     prefix=<span class="str">"/query"</span>,     tags=[<span class="str">"RAG Query"</span>])
+app.include_router(entities.router,  prefix=<span class="str">"/entities"</span>,  tags=[<span class="str">"Entity Resolution"</span>])
+
+<span class="dec">@app.get</span>(<span class="str">"/health"</span>)
+<span class="kw">async def</span> <span class="fn">health</span>():
+    <span class="kw">return</span> {<span class="str">"status"</span>: <span class="str">"healthy"</span>, <span class="str">"version"</span>: <span class="str">"2.0.0"</span>}
+
+<span class="cmt"># ── customers.py: GET /customers/{id} ─────────────────────</span>
+<span class="cmt"># Queries Redshift gold mart for customer 360 data</span>
+<span class="dec">@router.get</span>(<span class="str">"/{customer_id}"</span>, response_model=Customer360)
+<span class="kw">async def</span> <span class="fn">get_customer_360</span>(customer_id: str, db=Depends(get_redshift_pool)):
+    sql = <span class="str">"""SELECT customer_id, resolved_entity_id, customer_name,
+              estimated_ltv, ltv_tier, churn_status, total_risk_score
+           FROM gold.mart_customer_360 WHERE customer_id = %s"""</span>
+    cur = db.cursor()
+    cur.execute(sql, (customer_id,))
+    row = cur.fetchone()
+    <span class="kw">if not</span> row: <span class="kw">raise</span> HTTPException(status_code=<span class="num">404</span>)
+    <span class="kw">return</span> Customer360(**dict(zip([d[<span class="num">0</span>] <span class="kw">for</span> d <span class="kw">in</span> cur.description], row)))
+
+<span class="cmt"># ── customers.py: GET /customers/{id}/graph ───────────────</span>
+<span class="cmt"># Queries Neo4j for relationship context</span>
+<span class="dec">@router.get</span>(<span class="str">"/{customer_id}/graph"</span>, response_model=CustomerGraphContext)
+<span class="kw">async def</span> <span class="fn">get_customer_graph_context</span>(customer_id: str, neo4j=Depends(get_neo4j_driver)):
+    <span class="kw">with</span> neo4j.session() <span class="kw">as</span> session:
+        result = session.run(<span class="str">"""
+            MATCH (c:Customer {customer_id: $cid})
+            OPTIONAL MATCH (c)-[:PLACED]->(o:Order)
+            OPTIONAL MATCH (c)-[:MADE]->(t:Transaction)
+            OPTIONAL MATCH (c)-[:SAME_AS]-(twin:Customer)
+            RETURN COUNT(DISTINCT o) AS orders,
+                   COUNT(DISTINCT t) AS txns,
+                   COUNT(DISTINCT twin) AS linked_profiles
+        """</span>, cid=customer_id)
+        <span class="kw">return</span> CustomerGraphContext(**result.single().data())`
+  },
+
+  rag_query: {
+    id: 'rag_query',
+    name: 'query.py',
+    path: ['api', 'routers', 'query.py'],
+    lang: 'Python (RAG)',
+    icon: '🤖',
+    section: 'FastAPI',
+    code: `<span class="cmt"># api/routers/query.py</span>
+<span class="cmt"># RAG endpoint: natural language → SQL → results</span>
+<span class="cmt"># Schema context injected into every Claude API call</span>
+
+SYSTEM_PROMPT = <span class="str">"""You are a data analyst.
+Convert natural language questions to SQL.
+
+Tables:
+  dbt_dev_gold.mart_customer_360      - customer profiles + LTV + risk
+  dbt_dev_gold.mart_daily_order_summary - daily order KPIs
+  dbt_dev_gold.mart_fraud_summary     - fraud signals by risk tier
+
+Rules: PostgreSQL only. Always use dbt_dev_gold. prefix. LIMIT 100.
+Return ONLY JSON: {"sql": "...", "explanation": "..."}"""</span>
+
+<span class="kw">async def</span> <span class="fn">generate_sql</span>(question):
+    <span class="kw">if not</span> settings.anthropic_api_key:
+        <span class="cmt"># Demo mode — return sample query without API call</span>
+        <span class="kw">return</span> (
+            <span class="str">"SELECT customer_id, customer_name, estimated_ltv, ltv_tier "</span>
+            <span class="str">"FROM dbt_dev_gold.mart_customer_360 "</span>
+            <span class="str">"ORDER BY estimated_ltv DESC LIMIT 10"</span>,
+            <span class="str">"Top 10 customers by lifetime value (demo mode)"</span>
+        )
+
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    message = client.messages.create(
+        model=<span class="str">"claude-sonnet-4-20250514"</span>,
+        max_tokens=<span class="num">1024</span>,
+        system=SYSTEM_PROMPT,                  <span class="cmt"># schema is the "retrieval"</span>
+        messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: question}],
+    )
+    parsed = json.loads(message.content[<span class="num">0</span>].text)
+    <span class="kw">return</span> parsed[<span class="str">"sql"</span>], parsed[<span class="str">"explanation"</span>]
+
+<span class="kw">def</span> <span class="fn">is_safe</span>(sql):
+    <span class="cmt"># Hard code-level safety — prompt instructions can be manipulated</span>
+    <span class="cmt"># Code checks cannot. Never skip this in production.</span>
+    u = sql.upper().strip()
+    <span class="kw">if not</span> u.startswith(<span class="str">"SELECT"</span>): <span class="kw">return False</span>
+    <span class="kw">for</span> kw <span class="kw">in</span> [<span class="str">"INSERT"</span>,<span class="str">"UPDATE"</span>,<span class="str">"DELETE"</span>,<span class="str">"DROP"</span>,<span class="str">"ALTER"</span>,<span class="str">"TRUNCATE"</span>]:
+        <span class="kw">if</span> kw <span class="kw">in</span> u: <span class="kw">return False</span>
+    <span class="kw">return True</span>
+
+<span class="dec">@router.post</span>(<span class="str">"/"</span>, response_model=RAGQueryResponse)
+<span class="kw">async def</span> <span class="fn">natural_language_query</span>(request: RAGQueryRequest, db=Depends(get_redshift_pool)):
+    sql, explanation = <span class="kw">await</span> generate_sql(request.question)
+    <span class="kw">if not</span> is_safe(sql): <span class="kw">raise</span> HTTPException(<span class="num">400</span>, <span class="str">"Query failed safety check"</span>)
+
+    cur = db.cursor()
+    cur.execute(sql.rstrip(<span class="str">";"</span>) + <span class="str">f" LIMIT {request.max_rows}"</span>)
+    rows = cur.fetchall()
+    cols = [d[<span class="num">0</span>] <span class="kw">for</span> d <span class="kw">in</span> cur.description]
+    data = [dict(zip(cols, r)) <span class="kw">for</span> r <span class="kw">in</span> rows]
+
+    <span class="kw">return</span> RAGQueryResponse(
+        question=request.question,
+        answer=explanation,
+        sql=sql,
+        data=data,
+        row_count=len(data),
+    )`
+  },
+
+  snowflake_setup: {
+    id: 'snowflake_setup',
+    name: '01_setup.sql',
+    path: ['snowflake', 'queries', '01_setup.sql'],
+    lang: 'SQL (Snowflake)',
+    icon: '❄️',
+    section: 'Snowflake',
+    code: `<span class="cmt">-- snowflake/queries/01_setup.sql</span>
+<span class="cmt">-- Bootstrap Snowflake for Project 2</span>
+
+<span class="cmt">-- Warehouse: auto-suspends after 60s idle (cost control)</span>
+<span class="kw">CREATE WAREHOUSE IF NOT EXISTS</span> PROJECT2_WH
+    WAREHOUSE_SIZE = XSMALL
+    AUTO_SUSPEND   = <span class="num">60</span>
+    AUTO_RESUME    = <span class="kw">TRUE</span>;
+
+<span class="kw">CREATE DATABASE IF NOT EXISTS</span> PROJECT2_DW;
+<span class="kw">USE DATABASE</span> PROJECT2_DW;
+
+<span class="kw">CREATE SCHEMA IF NOT EXISTS</span> RAW;       <span class="cmt">-- raw copies from S3</span>
+<span class="kw">CREATE SCHEMA IF NOT EXISTS</span> GOLD;      <span class="cmt">-- synced from Redshift gold</span>
+<span class="kw">CREATE SCHEMA IF NOT EXISTS</span> ANALYTICS; <span class="cmt">-- views for the fraud team</span>
+
+<span class="cmt">-- Storage integration: connect Snowflake to your S3 bucket</span>
+<span class="kw">CREATE STORAGE INTEGRATION</span> s3_project2_integration
+    TYPE                  = EXTERNAL_STAGE
+    STORAGE_PROVIDER      = S3
+    ENABLED               = <span class="kw">TRUE</span>
+    STORAGE_AWS_ROLE_ARN  = <span class="str">'arn:aws:iam::ACCOUNT:role/project2-snowflake-role'</span>
+    STORAGE_ALLOWED_LOCATIONS = (<span class="str">'s3://project2-data-lake-dev/gold/'</span>);
+
+<span class="cmt">-- External stage points at S3 gold zone</span>
+<span class="kw">CREATE STAGE</span> RAW.s3_gold_stage
+    URL                = <span class="str">'s3://project2-data-lake-dev/gold/'</span>
+    STORAGE_INTEGRATION = s3_project2_integration
+    FILE_FORMAT        = (<span class="kw">TYPE</span> = PARQUET);
+
+<span class="cmt">-- Snowpipe: auto-ingest when new files land in S3 gold zone</span>
+<span class="kw">CREATE PIPE</span> RAW.pipe_customer_360
+    AUTO_INGEST = <span class="kw">TRUE</span>
+    <span class="kw">AS</span>
+    <span class="kw">COPY INTO</span> GOLD.customer_360
+    <span class="kw">FROM</span> (
+        <span class="kw">SELECT</span> $<span class="num">1</span>:customer_id::VARCHAR,
+               $<span class="num">1</span>:estimated_ltv::NUMBER,
+               $<span class="num">1</span>:ltv_tier::VARCHAR,
+               $<span class="num">1</span>:churn_status::VARCHAR
+        <span class="kw">FROM</span> @RAW.s3_gold_stage/ecommerce/customer_360/
+    )
+    FILE_FORMAT = (<span class="kw">TYPE</span> = PARQUET);
+
+<span class="cmt">-- Data Sharing: give partner read access to fraud data</span>
+<span class="cmt">-- Zero data movement — they query your live Snowflake data</span>
+<span class="kw">CREATE SHARE</span> project2_fraud_share;
+<span class="kw">GRANT USAGE ON DATABASE</span> PROJECT2_DW <span class="kw">TO SHARE</span> project2_fraud_share;
+<span class="kw">GRANT SELECT ON TABLE</span> GOLD.fraud_summary <span class="kw">TO SHARE</span> project2_fraud_share;
+<span class="cmt">-- ALTER SHARE project2_fraud_share ADD ACCOUNTS = '&lt;partner_account&gt;';</span>`
+  },
+
+  redshift_schema: {
+    id: 'redshift_schema',
+    name: 'redshift_schema.sql',
+    path: ['infrastructure', 'scripts', 'redshift_schema.sql'],
+    lang: 'SQL (Redshift)',
+    icon: '🔴',
+    section: 'Infrastructure',
+    code: `<span class="cmt">-- infrastructure/scripts/redshift_schema.sql</span>
+<span class="cmt">-- Star schema for the gold layer analytical warehouse</span>
+<span class="cmt">-- DISTKEY controls which node rows land on (join performance)</span>
+<span class="cmt">-- SORTKEY controls physical sort order (range scan performance)</span>
+
+<span class="kw">CREATE TABLE</span> warehouse.dim_customer (
+    customer_sk      BIGINT IDENTITY(<span class="num">1</span>,<span class="num">1</span>) <span class="kw">PRIMARY KEY</span>,
+    customer_id      VARCHAR(<span class="num">64</span>) <span class="kw">NOT NULL</span>,
+    resolved_entity_id VARCHAR(<span class="num">64</span>),    <span class="cmt">-- from entity resolution</span>
+    full_name        VARCHAR(<span class="num">256</span>),
+    email_normalised VARCHAR(<span class="num">256</span>),
+    country          VARCHAR(<span class="num">4</span>),
+    ltv_tier         VARCHAR(<span class="num">16</span>),
+    <span class="cmt">-- SCD Type 2: track changes over time</span>
+    valid_from       TIMESTAMP <span class="kw">NOT NULL</span>,
+    valid_to         TIMESTAMP,
+    is_current       BOOLEAN <span class="kw">DEFAULT TRUE</span>
+)
+DISTKEY(customer_id)    <span class="cmt">-- all customer rows on same node = fast joins</span>
+SORTKEY(customer_id, valid_from);
+
+<span class="kw">CREATE TABLE</span> warehouse.fact_orders (
+    order_sk         BIGINT IDENTITY(<span class="num">1</span>,<span class="num">1</span>) <span class="kw">PRIMARY KEY</span>,
+    order_id         VARCHAR(<span class="num">64</span>) <span class="kw">NOT NULL</span>,
+    customer_sk      BIGINT <span class="kw">REFERENCES</span> dim_customer(customer_sk),
+    merchant_sk      BIGINT <span class="kw">REFERENCES</span> dim_merchant(merchant_sk),
+    order_date_sk    INTEGER <span class="kw">REFERENCES</span> dim_date(date_sk),
+    <span class="cmt">-- Measures</span>
+    gross_amount     DECIMAL(<span class="num">18</span>,<span class="num">2</span>),
+    discount_amount  DECIMAL(<span class="num">18</span>,<span class="num">2</span>),
+    net_amount       DECIMAL(<span class="num">18</span>,<span class="num">2</span>),
+    item_count       SMALLINT,
+    order_status     VARCHAR(<span class="num">32</span>)
+)
+DISTKEY(customer_sk)         <span class="cmt">-- co-locate with dim_customer</span>
+SORTKEY(order_date_sk, customer_sk);  <span class="cmt">-- fast date range queries</span>
+
+<span class="kw">CREATE TABLE</span> warehouse.fact_transactions (
+    transaction_sk   BIGINT IDENTITY(<span class="num">1</span>,<span class="num">1</span>) <span class="kw">PRIMARY KEY</span>,
+    transaction_id   VARCHAR(<span class="num">64</span>) <span class="kw">NOT NULL</span>,
+    customer_sk      BIGINT <span class="kw">REFERENCES</span> dim_customer(customer_sk),
+    <span class="cmt">-- Measures</span>
+    amount           DECIMAL(<span class="num">18</span>,<span class="num">2</span>),
+    <span class="cmt">-- Fraud signals from Databricks</span>
+    risk_score       SMALLINT,
+    risk_tier        VARCHAR(<span class="num">8</span>),
+    flag_high_value       BOOLEAN,
+    flag_velocity_spike   BOOLEAN,
+    flag_amount_anomaly   BOOLEAN
+)
+DISTKEY(customer_sk)
+SORTKEY(txn_date_sk, customer_sk);`
+  },
+
+  s3_setup: {
+    id: 's3_setup',
+    name: 'setup_s3_lake.py',
+    path: ['infrastructure', 'scripts', 'setup_s3_lake.py'],
+    lang: 'Python',
+    icon: '🪣',
+    section: 'Infrastructure',
+    code: `<span class="cmt"># infrastructure/scripts/setup_s3_lake.py</span>
+<span class="cmt"># Bootstrap the S3 data lake — run once per environment</span>
+<span class="cmt"># Creates bronze/silver/gold zones with lifecycle rules</span>
+
+LAKE_STRUCTURE = {
+    <span class="str">"bronze"</span>: {
+        <span class="str">"ecommerce/orders/"</span>:       <span class="str">"Raw order events from Kinesis"</span>,
+        <span class="str">"ecommerce/customers/"</span>:    <span class="str">"Raw customer records (batch CRM)"</span>,
+        <span class="str">"ecommerce/clickstream/"</span>:  <span class="str">"Raw clickstream from Kinesis"</span>,
+        <span class="str">"financial/transactions/"</span>: <span class="str">"Raw payment events"</span>,
+        <span class="str">"financial/merchants/"</span>:    <span class="str">"Raw merchant data"</span>,
+    },
+    <span class="str">"silver"</span>: {
+        <span class="str">"ecommerce/orders/"</span>:       <span class="str">"Cleaned orders (partitioned by date)"</span>,
+        <span class="str">"ecommerce/customers/"</span>:    <span class="str">"Resolved customer entities"</span>,
+        <span class="str">"financial/transactions/"</span>: <span class="str">"Validated + fraud-flagged transactions"</span>,
+    },
+    <span class="str">"gold"</span>: {
+        <span class="str">"ecommerce/daily_order_summary/"</span>: <span class="str">"Daily KPIs (feeds Snowflake)"</span>,
+        <span class="str">"ecommerce/customer_ltv/"</span>:        <span class="str">"LTV feature table"</span>,
+        <span class="str">"financial/fraud_features/"</span>:      <span class="str">"Fraud model feature table"</span>,
+        <span class="str">"shared/entity_resolution/"</span>:      <span class="str">"Cross-domain entity map"</span>,
+    },
+    <span class="str">"staging"</span>: {
+        <span class="str">"databricks_checkpoints/"</span>: <span class="str">"Spark structured streaming checkpoints"</span>,
+        <span class="str">"dbt_artifacts/"</span>:         <span class="str">"dbt manifest and run results"</span>,
+    },
+}
+
+LIFECYCLE_RULES = [
+    {   <span class="cmt"># Bronze: cheap storage after 90 days, Glacier after 1 year</span>
+        <span class="str">"ID"</span>: <span class="str">"bronze-to-glacier"</span>,
+        <span class="str">"Filter"</span>: {<span class="str">"Prefix"</span>: <span class="str">"bronze/"</span>},
+        <span class="str">"Transitions"</span>: [
+            {<span class="str">"Days"</span>: <span class="num">90</span>,  <span class="str">"StorageClass"</span>: <span class="str">"STANDARD_IA"</span>},
+            {<span class="str">"Days"</span>: <span class="num">365</span>, <span class="str">"StorageClass"</span>: <span class="str">"GLACIER"</span>},
+        ],
+    },
+    {   <span class="cmt"># Logs: expire after 30 days</span>
+        <span class="str">"ID"</span>: <span class="str">"logs-expiry"</span>,
+        <span class="str">"Filter"</span>: {<span class="str">"Prefix"</span>: <span class="str">"logs/"</span>},
+        <span class="str">"Expiration"</span>: {<span class="str">"Days"</span>: <span class="num">30</span>},
+    },
+]
+
+<span class="kw">def</span> <span class="fn">main</span>():
+    s3 = boto3.client(<span class="str">"s3"</span>)
+    s3.create_bucket(Bucket=BUCKET)
+    s3.put_bucket_versioning(Bucket=BUCKET,
+        VersioningConfiguration={<span class="str">"Status"</span>: <span class="str">"Enabled"</span>})
+    s3.put_bucket_lifecycle_configuration(
+        Bucket=BUCKET, LifecycleConfiguration={<span class="str">"Rules"</span>: LIFECYCLE_RULES})
+    <span class="cmt"># Create prefixes as placeholder objects</span>
+    <span class="kw">for</span> zone, prefixes <span class="kw">in</span> LAKE_STRUCTURE.items():
+        <span class="kw">for</span> prefix <span class="kw">in</span> prefixes:
+            s3.put_object(Bucket=BUCKET, Key=<span class="str">f"{zone}/{prefix}.keep"</span>, Body=<span class="str">b""</span>)`
+  },
+};
+
+// ═══════════════════════════════════════════════════════════
+// SIDEBAR STRUCTURE
+// ═══════════════════════════════════════════════════════════
+const sections = [
+  { name: 'Airflow', icon: '🌀', files: ['airflow_dag'] },
+  { name: 'Databricks', icon: '🔥', files: ['orders_nb', 'transactions_nb', 'entity_res'] },
+  { name: 'dbt', icon: '🏗️', files: ['dbt_customer'] },
+  { name: 'Kinesis', icon: '⚡', files: ['kinesis_producer'] },
+  { name: 'Lambda', icon: '𝜆', files: ['lambda_trigger'] },
+  { name: 'Snowflake', icon: '❄️', files: ['snowflake_setup'] },
+  { name: 'Neo4j', icon: '🕸️', files: ['neo4j_schema'] },
+  { name: 'FastAPI', icon: '🚀', files: ['api_main', 'rag_query'] },
+  { name: 'Infrastructure', icon: '🔧', files: ['redshift_schema', 's3_setup'] },
+];
+
+// ═══════════════════════════════════════════════════════════
+// CONNECTIONS DATA
+// ═══════════════════════════════════════════════════════════
+const connections = [
+  {
+    icon: '⚡→𝜆', title: 'Kinesis → Lambda',
+    subtitle: 'How streaming events trigger the pipeline',
+    steps: [
+      { icon: '⚡', text: 'producer.py sends events to <code>project2-orders-stream</code> using PutRecords (batches of 500)' },
+      { icon: '→', text: 'consumer.py polls shards with GetRecords, buffers records, flushes to S3 bronze every 60s or 10k records' },
+      { icon: '🪣', text: 'Parquet file lands at <code>bronze/ecommerce/orders/date=2025-01-15/</code>' },
+      { icon: '𝜆', text: 'S3 event notification fires s3_trigger.py Lambda within seconds of file creation' },
+      { icon: '🔍', text: 'Lambda checks DynamoDB: has this date+domain already been triggered?' },
+      { icon: '🌀', text: 'Lambda POSTs to Airflow REST API: <code>/api/v1/dags/project2_master_pipeline/dagRuns</code>' },
+    ]
+  },
+  {
+    icon: '🌀→🔥', title: 'Airflow → Databricks',
+    subtitle: 'How Airflow orchestrates Spark notebook jobs',
+    steps: [
+      { icon: '🌀', text: 'DatabricksRunNowOperator calls Databricks REST API: <code>/api/2.0/jobs/run-now</code>' },
+      { icon: '📦', text: 'Airflow passes notebook_params: <code>{"source_table": "orders", "execution_date": "{{ ds }}"}</code>' },
+      { icon: '🔥', text: 'Databricks cluster starts, orders_bronze_to_silver.py reads from S3 bronze with explicit schema' },
+      { icon: '✅', text: 'Notebook validates, deduplicates, and MERGEs into S3 silver Delta table' },
+      { icon: '📊', text: 'Notebook calls <code>dbutils.notebook.exit(str(metrics))</code> — metrics passed back to Airflow' },
+      { icon: '🌀', text: 'Airflow marks task SUCCESS, triggers next task group (entity_resolution)' },
+    ]
+  },
+  {
+    icon: '🔥→🏗️', title: 'Databricks → dbt',
+    subtitle: 'How silver data becomes gold via dbt models',
+    steps: [
+      { icon: '🔥', text: 'Databricks writes silver Delta tables to S3: <code>silver/ecommerce/orders/</code>' },
+      { icon: '🔴', text: 'Redshift COPY command loads silver Parquet into <code>staging.orders</code> table' },
+      { icon: '🏗️', text: 'dbt stg_orders creates a view on top of staging.orders — thin cleaning layer' },
+      { icon: '🏗️', text: 'dbt int_customer_order_metrics builds incremental table — all business logic here' },
+      { icon: '🏗️', text: 'dbt mart_customer_360 joins customers + order_metrics + txn_metrics into one wide gold table' },
+      { icon: '✅', text: 'dbt test runs: not_null, unique, accepted_values — failed test blocks pipeline' },
+    ]
+  },
+  {
+    icon: '🏗️→❄️', title: 'dbt → Snowflake',
+    subtitle: 'How gold data syncs cross-cloud to Snowflake',
+    steps: [
+      { icon: '🏗️', text: 'dbt writes gold marts to Redshift: <code>gold.mart_daily_order_summary</code>' },
+      { icon: '🌀', text: 'Airflow SnowflakeOperator triggers UNLOAD from Redshift to S3 gold zone' },
+      { icon: '🪣', text: 'Parquet files land at <code>gold/ecommerce/daily_order_summary/date=2025-01-15/</code>' },
+      { icon: '❄️', text: 'Snowpipe detects new files via SQS notification, fires COPY INTO automatically' },
+      { icon: '📊', text: 'Partner analytics team queries <code>PROJECT2_DW.ANALYTICS.vw_fraud_dashboard</code>' },
+      { icon: '🔗', text: 'Data Share gives partner Snowflake account live read access — zero data movement' },
+    ]
+  },
+  {
+    icon: '🧬→🕸️', title: 'Entity Resolution → Neo4j',
+    subtitle: 'How resolved entities become graph edges',
+    steps: [
+      { icon: '🔥', text: 'entity_resolution.py runs on Databricks: blocking → scoring → GraphFrames connected components' },
+      { icon: '💾', text: 'Resolved entity map written to <code>gold/shared/entity_resolution/</code> as Delta table' },
+      { icon: '🌀', text: 'Airflow neo4j_refresh task calls entity_loader.py' },
+      { icon: '🕸️', text: 'entity_loader reads S3 gold Parquet, UPSERTs Customer nodes with resolved_entity_id' },
+      { icon: '🔗', text: 'SAME_AS edges created between all Customer nodes sharing the same resolved_entity_id' },
+      { icon: '📊', text: 'Fraud ring detection query traverses SAME_AS + AT + MADE in one Cypher statement' },
+    ]
+  },
+  {
+    icon: '🔴→🚀', title: 'Redshift → FastAPI',
+    subtitle: 'How the gold layer becomes a queryable API',
+    steps: [
+      { icon: '🚀', text: '<code>GET /customers/{id}</code> — dependency injection: get_redshift_pool() opens connection' },
+      { icon: '🔴', text: 'SQL query runs against <code>gold.mart_customer_360</code> in Redshift' },
+      { icon: '📦', text: 'Pydantic validates response: Customer360 model enforces types, handles nulls' },
+      { icon: '🕸️', text: '<code>GET /customers/{id}/graph</code> — parallel call to Neo4j via get_neo4j_driver()' },
+      { icon: '🔗', text: 'Cypher traversal returns orders, merchants, linked profiles from graph' },
+      { icon: '🤖', text: '<code>POST /query</code> — question → Claude API (schema as context) → SQL → Redshift → results' },
+    ]
+  },
+  {
+    icon: '🪣→🔴', title: 'S3 → Redshift',
+    subtitle: 'How S3 silver data loads into the warehouse',
+    steps: [
+      { icon: '🪣', text: 'Databricks writes silver Delta Parquet to <code>s3://bucket/silver/ecommerce/orders/</code>' },
+      { icon: '🔴', text: 'Redshift COPY command: <code>COPY staging.orders FROM \'s3://bucket/silver/ecommerce/orders/\'</code>' },
+      { icon: '🔍', text: 'Glue Crawler updates schema catalog — Redshift uses Glue metadata for column types' },
+      { icon: '✅', text: 'DISTKEY(customer_id) ensures order rows co-locate with customer dimension rows' },
+      { icon: '🏗️', text: 'dbt models read from staging.orders and build up through intermediate to gold marts' },
+    ]
+  },
+  {
+    icon: '🔧→☁️', title: 'Terraform → AWS',
+    subtitle: 'How infrastructure is provisioned as code',
+    steps: [
+      { icon: '📄', text: '<code>kinesis_lambda.tf</code> defines all resources: 3 Kinesis streams, Lambda, DynamoDB, SNS, IAM' },
+      { icon: '🔧', text: '<code>terraform plan</code> shows exactly what will be created/modified/destroyed' },
+      { icon: '✅', text: '<code>terraform apply</code> provisions all AWS resources in one command (~10 minutes)' },
+      { icon: '𝜆', text: 'Lambda function code zipped from <code>ingestion/lambda/s3_trigger.py</code> and deployed automatically' },
+      { icon: '🔗', text: 'S3 event notification wired to Lambda ARN — file arrives → Lambda fires automatically' },
+      { icon: '🔒', text: 'IAM roles grant each service exactly the permissions it needs and nothing more' },
+    ]
+  },
+];
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let openTabs = [];
+let activeTab = null;
+let activeView = 'welcome';
+
+// ═══════════════════════════════════════════════════════════
+// BUILD SIDEBAR
+// ═══════════════════════════════════════════════════════════
+function buildSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  sections.forEach(section => {
+    const div = document.createElement('div');
+    div.className = 'sidebar-section';
+    const header = document.createElement('div');
+    header.className = 'sidebar-header open';
+    header.innerHTML = `<span class="chevron">▶</span> ${section.icon} ${section.name}`;
+    header.onclick = () => {
+      header.classList.toggle('open');
+      filesDiv.classList.toggle('open');
+    };
+    const filesDiv = document.createElement('div');
+    filesDiv.className = 'sidebar-files open';
+    section.files.forEach(fid => {
+      const f = files[fid];
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.id = 'sidebar-' + fid;
+      item.innerHTML = `<span class="file-icon">${getLangIcon(f.lang)}</span><span class="file-name">${f.name}</span>`;
+      item.onclick = () => openFile(fid);
+      filesDiv.appendChild(item);
+    });
+    div.appendChild(header);
+    div.appendChild(filesDiv);
+    sidebar.appendChild(div);
+  });
+}
+
+function getLangIcon(lang) {
+  if (lang.includes('Python')) return '🐍';
+  if (lang.includes('SQL')) return '🗄';
+  if (lang.includes('Cypher')) return '🔷';
+  if (lang.includes('Spark') || lang.includes('PySpark')) return '⚡';
+  return '📄';
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILE OPERATIONS
+// ═══════════════════════════════════════════════════════════
+function openFileById(id) {
+  openFile(id);
+  // switch to code view
+  switchView('code');
+}
+
+function openFile(id) {
+  const f = files[id];
+  if (!openTabs.find(t => t === id)) {
+    openTabs.push(id);
+  }
+  activeTab = id;
+  renderTabs();
+  renderCode(f);
+  updateSidebarActive(id);
+  // show code panel
+  switchView('code');
+}
+
+function closeTab(id, e) {
+  e.stopPropagation();
+  openTabs = openTabs.filter(t => t !== id);
+  if (activeTab === id) {
+    activeTab = openTabs.length ? openTabs[openTabs.length - 1] : null;
+    if (activeTab) renderCode(files[activeTab]);
+    else switchView('welcome');
+  }
+  renderTabs();
+  updateSidebarActive(activeTab);
+}
+
+function renderTabs() {
+  const container = document.getElementById('fileTabs');
+  container.innerHTML = '';
+  openTabs.forEach(id => {
+    const f = files[id];
+    const tab = document.createElement('div');
+    tab.className = 'file-tab' + (id === activeTab ? ' active' : '');
+    tab.innerHTML = `${getLangIcon(f.lang)} ${f.name} <span class="tab-close" onclick="closeTab('${id}', event)">×</span>`;
+    tab.onclick = () => openFile(id);
+    container.appendChild(tab);
+  });
+}
+
+function renderCode(f) {
+  const pathEl = document.getElementById('codePath');
+  pathEl.innerHTML = f.path.map((seg, i) =>
+    i === f.path.length - 1
+      ? `<span class="current">${seg}</span>`
+      : `<span class="segment">${seg} /</span> `
+  ).join('');
+  document.getElementById('codeLang').textContent = f.lang;
+
+  const lines = f.code.split('\n');
+  let html = '<table class="code-table"><tbody>';
+  lines.forEach((line, i) => {
+    html += `<tr>
+      <td class="line-numbers">${i + 1}</td>
+      <td class="line-code">${line || ' '}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('codeBody').innerHTML = html;
+}
+
+function updateSidebarActive(id) {
+  document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+  if (id) {
+    const el = document.getElementById('sidebar-' + id);
+    if (el) el.classList.add('active');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// VIEW SWITCHING
+// ═══════════════════════════════════════════════════════════
+function switchView(view) {
+  activeView = view;
+  document.getElementById('welcomeView').style.display = 'none';
+  document.getElementById('archView').style.display = 'none';
+  document.getElementById('connectionsView').style.display = 'none';
+  document.getElementById('codeView').style.display = 'none';
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  if (view === 'welcome') {
+    document.getElementById('welcomeView').style.display = '';
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+  } else if (view === 'arch') {
+    document.getElementById('archView').style.display = '';
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  } else if (view === 'connections') {
+    document.getElementById('connectionsView').style.display = '';
+    document.querySelectorAll('.tab-btn')[2].classList.add('active');
+  } else if (view === 'code') {
+    document.getElementById('codeView').style.display = '';
+    // no tab button to highlight for code view
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUILD CONNECTIONS
+// ═══════════════════════════════════════════════════════════
+function buildConnections() {
+  const grid = document.getElementById('connGrid');
+  connections.forEach(conn => {
+    const card = document.createElement('div');
+    card.className = 'conn-card';
+    let stepsHtml = conn.steps.map(s =>
+      `<div class="conn-step"><div class="conn-step-icon">${s.icon}</div><div class="conn-step-text">${s.text}</div></div>`
+      + (s !== conn.steps[conn.steps.length-1] ? '<div class="conn-arrow">↓</div>' : '')
+    ).join('');
+    card.innerHTML = `
+      <div class="conn-card-header">
+        <div class="conn-icon">${conn.icon}</div>
+        <div><div class="conn-title">${conn.title}</div><div class="conn-subtitle">${conn.subtitle}</div></div>
+      </div>
+      <div class="conn-body"><div class="conn-flow">${stepsHtml}</div></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+buildSidebar();
+buildConnections();
+switchView('welcome');
+</script>
+</body>
+</html>

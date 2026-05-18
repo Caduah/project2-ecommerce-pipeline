@@ -298,4 +298,4 @@ export ANTHROPIC_API_KEY=your-key
 ---
 
 ## Author
-Built as a portfolio data engineering project demonstrating end-to-end pipeline design across AWS, Databricks, Snowflake, Airflow, dbt, Neo4j, and FastAPI.
+CALEB DUAH

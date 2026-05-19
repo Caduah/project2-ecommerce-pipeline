@@ -1,23 +1,4 @@
-"""
-airflow/dags/project2_master_pipeline.py
 
-Master DAG for the Project 2 e-commerce & financial pipeline.
-This DAG orchestrates all pipeline stages in the correct order:
-
-  1. Ingest batch sources → S3 bronze
-  2. Run Glue crawlers to update schema catalog
-  3. Trigger Databricks batch transformation (bronze → silver)
-  4. Run dbt models (silver → gold in Redshift)
-  5. Sync gold layer to Snowflake
-  6. Refresh Neo4j knowledge graph
-  7. Run data quality checks
-  8. Send pipeline health notification
-
-The Kinesis streaming pipeline runs independently (always-on).
-This DAG handles the daily batch window.
-
-Schedule: daily at 02:00 UTC (after midnight data is complete)
-"""
 
 from __future__ import annotations
 

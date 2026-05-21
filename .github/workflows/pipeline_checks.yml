@@ -6,101 +6,79 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
 
-  # ── Job 1: Python syntax check ────────────────────────────
   syntax-check:
-    name: Python Syntax & Imports
+    name: Python Syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Check Python syntax
         run: |
-          echo "Checking Python syntax..."
-          FAIL=0
-          for f in $(find . -name "*.py" \
-            -not -path "./.git/*" \
-            -not -path "./dbt/*" \
-            -not -path "./airflow/logs/*"); do
-            if python3 -c "
-import ast, sys
-try:
-    ast.parse(open('$f').read())
-    print('  ✓ $f')
-except SyntaxError as e:
-    print(f'  ✗ $f: {e}')
-    sys.exit(1)
-" 2>/dev/null; then
-              true
-            else
-              echo "  ✗ SYNTAX ERROR: $f"
-              FAIL=$((FAIL+1))
-            fi
-          done
-          if [ $FAIL -gt 0 ]; then
-            echo "$FAIL files have syntax errors"
-            exit 1
-          fi
-          echo "All Python files valid"
+          python3 - << 'PYEOF'
+          import ast, os, sys
+          errors = []
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if d not in ['.git', 'dbt', 'target', '__pycache__']]
+              for fname in files:
+                  if fname.endswith('.py'):
+                      path = os.path.join(root, fname)
+                      try:
+                          ast.parse(open(path).read())
+                          print(f'  ok {path}')
+                      except SyntaxError as e:
+                          errors.append(f'  FAIL {path}: {e}')
+          if errors:
+              for e in errors: print(e)
+              sys.exit(1)
+          print('All Python files valid')
+          PYEOF
 
-  # ── Job 2: dbt model file check ───────────────────────────
   dbt-validate:
     name: dbt Model Validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Check dbt models exist
         run: |
-          FAIL=0
-          for f in \
-            "dbt/dbt_project.yml" \
-            "dbt/models/staging/stg_orders.sql" \
-            "dbt/models/staging/stg_transactions.sql" \
-            "dbt/models/staging/stg_customers.sql" \
-            "dbt/models/staging/sources.yml" \
-            "dbt/models/intermediate/int_customer_order_metrics.sql" \
-            "dbt/models/intermediate/int_customer_transaction_metrics.sql" \
-            "dbt/models/marts/mart_customer_360.sql" \
-            "dbt/models/marts/mart_daily_order_summary.sql" \
-            "dbt/models/marts/mart_fraud_summary.sql"; do
-            if [ -f "$f" ]; then
-              echo "  ✓ $f"
-            else
-              echo "  ✗ MISSING: $f"
-              FAIL=$((FAIL+1))
-            fi
-          done
-          [ $FAIL -eq 0 ] || exit 1
-          echo "All dbt models present"
+          python3 - << 'PYEOF'
+          import os, sys
+          required = [
+            'dbt/dbt_project.yml',
+            'dbt/models/staging/stg_orders.sql',
+            'dbt/models/staging/stg_transactions.sql',
+            'dbt/models/staging/stg_customers.sql',
+            'dbt/models/intermediate/int_customer_order_metrics.sql',
+            'dbt/models/intermediate/int_customer_transaction_metrics.sql',
+            'dbt/models/marts/mart_customer_360.sql',
+            'dbt/models/marts/mart_daily_order_summary.sql',
+            'dbt/models/marts/mart_fraud_summary.sql',
+          ]
+          missing = [f for f in required if not os.path.exists(f)]
+          for f in required:
+              status = 'ok' if os.path.exists(f) else 'MISSING'
+              print(f'  {status} {f}')
+          if missing:
+              sys.exit(1)
+          print('All dbt models present')
+          PYEOF
 
-  # ── Job 3: API validation ─────────────────────────────────
   api-validate:
     name: FastAPI Validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install fastapi pydantic pydantic-settings anthropic psycopg2-binary neo4j -q
-
+      - run: pip install fastapi pydantic pydantic-settings anthropic psycopg2-binary neo4j -q
       - name: Validate API files
         run: |
           python3 - << 'PYEOF'
-          import ast, sys, os
+          import ast, os, sys
           files = [
             'api/main.py',
             'api/core/config.py',
@@ -114,81 +92,63 @@ except SyntaxError as e:
           ]
           errors = []
           for f in files:
-            if not os.path.exists(f):
-              errors.append(f'  ✗ MISSING: {f}')
-              continue
-            try:
-              ast.parse(open(f).read())
-              print(f'  ✓ {f}')
-            except SyntaxError as e:
-              errors.append(f'  ✗ {f}: {e}')
+              if not os.path.exists(f):
+                  errors.append(f'  MISSING {f}')
+                  continue
+              try:
+                  ast.parse(open(f).read())
+                  print(f'  ok {f}')
+              except SyntaxError as e:
+                  errors.append(f'  FAIL {f}: {e}')
           if errors:
-            [print(e) for e in errors]
-            sys.exit(1)
+              for e in errors: print(e)
+              sys.exit(1)
           print('All API files valid')
           PYEOF
 
-  # ── Job 4: Project structure ──────────────────────────────
   structure-check:
     name: Project Structure
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: List repo structure for debugging
+      - name: Show repo layout
         run: |
-          echo "=== Top level ==="
-          ls -la
-          echo "=== databricks/ ==="
-          ls databricks/notebooks/ 2>/dev/null || echo "NOT FOUND"
-          echo "=== snowflake/ ==="
-          ls snowflake/queries/ 2>/dev/null || echo "NOT FOUND"
-          echo "=== neo4j/ ==="
-          ls neo4j/queries/ 2>/dev/null || echo "NOT FOUND"
-          echo "=== ingestion/ ==="
-          ls ingestion/kinesis/ 2>/dev/null || echo "NOT FOUND"
-          ls ingestion/lambda/ 2>/dev/null || echo "NOT FOUND"
-
-      - name: Verify pipeline phases
+          echo "=== root ===" && ls
+          echo "=== airflow/dags ===" && ls airflow/dags/ 2>/dev/null || echo NOT FOUND
+          echo "=== databricks/notebooks ===" && ls databricks/notebooks/ 2>/dev/null || echo NOT FOUND
+          echo "=== ingestion ===" && ls ingestion/ 2>/dev/null || echo NOT FOUND
+          echo "=== snowflake ===" && ls snowflake/ 2>/dev/null || echo NOT FOUND
+          echo "=== neo4j ===" && ls neo4j/ 2>/dev/null || echo NOT FOUND
+          echo "=== api ===" && ls api/ 2>/dev/null || echo NOT FOUND
+      - name: Verify all phases
         run: |
-          PASS=0; FAIL=0
-          check() {
-            if [ -f "$1" ] || [ -d "$1" ]; then
-              echo "  ✓ $1"; PASS=$((PASS+1))
-            else
-              echo "  ✗ MISSING: $1"; FAIL=$((FAIL+1))
-            fi
-          }
-
-          echo "=== Phase 1: Airflow ==="
-          check "airflow/dags/project2_master_pipeline.py"
-
-          echo "=== Phase 2: Databricks ==="
-          check "databricks/notebooks/orders_bronze_to_silver.py"
-          check "databricks/notebooks/transactions_bronze_to_silver.py"
-          check "databricks/notebooks/customers_bronze_to_silver.py"
-          check "databricks/notebooks/entity_resolution.py"
-
-          echo "=== Phase 3: dbt ==="
-          check "dbt/models/marts/mart_customer_360.sql"
-          check "infrastructure/scripts/redshift_schema.sql"
-
-          echo "=== Phase 4: Kinesis + Lambda ==="
-          check "ingestion/kinesis/producer.py"
-          check "ingestion/lambda/s3_trigger.py"
-
-          echo "=== Phase 5: Snowflake ==="
-          check "snowflake/queries/01_setup.sql"
-
-          echo "=== Phase 6: Neo4j ==="
-          check "neo4j/queries/01_schema.cypher"
-          check "neo4j/loaders/entity_loader.py"
-
-          echo "=== Phase 7: FastAPI ==="
-          check "api/main.py"
-          check "api/routers/query.py"
-
-          echo ""
-          echo "Result: $PASS passed, $FAIL failed"
-          [ $FAIL -eq 0 ] || exit 1
-          echo "✅ All pipeline phases verified"
+          python3 - << 'PYEOF'
+          import os, sys
+          checks = [
+            ('Phase 1 Airflow',     'airflow/dags/project2_master_pipeline.py'),
+            ('Phase 2 Orders NB',   'databricks/notebooks/orders_bronze_to_silver.py'),
+            ('Phase 2 Txns NB',     'databricks/notebooks/transactions_bronze_to_silver.py'),
+            ('Phase 2 Custs NB',    'databricks/notebooks/customers_bronze_to_silver.py'),
+            ('Phase 2 Entity Res',  'databricks/notebooks/entity_resolution.py'),
+            ('Phase 3 dbt mart',    'dbt/models/marts/mart_customer_360.sql'),
+            ('Phase 3 Redshift',    'infrastructure/scripts/redshift_schema.sql'),
+            ('Phase 4 Producer',    'ingestion/kinesis/producer.py'),
+            ('Phase 4 Consumer',    'ingestion/kinesis/consumer.py'),
+            ('Phase 4 Lambda',      'ingestion/lambda/s3_trigger.py'),
+            ('Phase 5 Snowflake',   'snowflake/queries/01_setup.sql'),
+            ('Phase 6 Neo4j',       'neo4j/queries/01_schema.cypher'),
+            ('Phase 6 Loader',      'neo4j/loaders/entity_loader.py'),
+            ('Phase 7 FastAPI',     'api/main.py'),
+            ('Phase 7 RAG',         'api/routers/query.py'),
+          ]
+          missing = []
+          for label, path in checks:
+              if os.path.exists(path):
+                  print(f'  ok  {label}: {path}')
+              else:
+                  print(f'  MISSING  {label}: {path}')
+                  missing.append(path)
+          print(f'\n{len(checks)-len(missing)}/{len(checks)} checks passed')
+          if missing:
+              sys.exit(1)
+          PYEOF

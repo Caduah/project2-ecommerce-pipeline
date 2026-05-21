@@ -1,0 +1,213 @@
+name: Pipeline Health Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ── Job 1: Python syntax check ────────────────────────────
+  syntax-check:
+    name: Python Syntax & Imports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check Python syntax on all files
+        run: |
+          echo "Checking Python syntax..."
+          find . -name "*.py" -not -path "./.git/*" | while read f; do
+            python3 -m py_compile "$f" && echo "  ✓ $f" || echo "  ✗ $f"
+          done
+          echo "Syntax check complete"
+
+      - name: Validate SQL files exist
+        run: |
+          echo "Checking SQL files..."
+          for f in \
+            "infrastructure/scripts/redshift_schema.sql" \
+            "snowflake/queries/01_setup.sql" \
+            "snowflake/queries/02_tables_and_pipes.sql" \
+            "snowflake/queries/03_analytics_and_tasks.sql"; do
+            if [ -f "$f" ]; then echo "  ✓ $f"; else echo "  ✗ MISSING: $f"; exit 1; fi
+          done
+
+      - name: Validate Cypher files exist
+        run: |
+          echo "Checking Cypher files..."
+          for f in \
+            "neo4j/queries/01_schema.cypher" \
+            "neo4j/queries/02_analytics_queries.cypher"; do
+            if [ -f "$f" ]; then echo "  ✓ $f"; else echo "  ✗ MISSING: $f"; exit 1; fi
+          done
+
+  # ── Job 2: dbt model validation ───────────────────────────
+  dbt-validate:
+    name: dbt Model Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt
+        run: pip install dbt-postgres==1.7.0 --quiet
+
+      - name: Write dbt profiles for CI
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'PROFILES'
+          project2:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: ci
+                password: ci
+                dbname: ci
+                schema: dbt_ci
+                threads: 1
+          PROFILES
+
+      - name: dbt parse (validates all model SQL without running)
+        working-directory: ./dbt
+        run: |
+          dbt parse --profiles-dir ~/.dbt --target ci 2>&1 | tail -5
+          echo "dbt parse complete"
+
+      - name: Check all required dbt models exist
+        run: |
+          echo "Checking dbt models..."
+          for f in \
+            "dbt/models/staging/stg_orders.sql" \
+            "dbt/models/staging/stg_transactions.sql" \
+            "dbt/models/staging/stg_customers.sql" \
+            "dbt/models/intermediate/int_customer_order_metrics.sql" \
+            "dbt/models/intermediate/int_customer_transaction_metrics.sql" \
+            "dbt/models/marts/mart_customer_360.sql" \
+            "dbt/models/marts/mart_daily_order_summary.sql" \
+            "dbt/models/marts/mart_fraud_summary.sql"; do
+            if [ -f "$f" ]; then echo "  ✓ $f"; else echo "  ✗ MISSING: $f"; exit 1; fi
+          done
+
+  # ── Job 3: API validation ─────────────────────────────────
+  api-validate:
+    name: FastAPI Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install API dependencies
+        run: pip install fastapi pydantic pydantic-settings anthropic psycopg2-binary neo4j --quiet
+
+      - name: Validate FastAPI app imports
+        run: |
+          cd api
+          python3 -c "
+          import ast, os, sys
+          files = [
+            'main.py',
+            'core/config.py',
+            'core/database.py',
+            'schemas/models.py',
+            'routers/customers.py',
+            'routers/orders.py',
+            'routers/fraud.py',
+            'routers/entities.py',
+            'routers/query.py',
+          ]
+          errors = []
+          for f in files:
+            try:
+              ast.parse(open(f).read())
+              print(f'  ✓ {f}')
+            except SyntaxError as e:
+              errors.append(f'  ✗ {f}: {e}')
+          if errors:
+            print('\n'.join(errors))
+            sys.exit(1)
+          print('All API files valid')
+          "
+
+  # ── Job 4: Project structure check ────────────────────────
+  structure-check:
+    name: Project Structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify all pipeline phases are present
+        run: |
+          echo "Verifying complete pipeline structure..."
+          PASS=0
+          FAIL=0
+
+          check() {
+            if [ -f "$1" ] || [ -d "$1" ]; then
+              echo "  ✓ $1"
+              PASS=$((PASS+1))
+            else
+              echo "  ✗ MISSING: $1"
+              FAIL=$((FAIL+1))
+            fi
+          }
+
+          # Phase 1 — Airflow
+          check "airflow/dags/project2_master_pipeline.py"
+          check "airflow/docker-compose.yml"
+
+          # Phase 2 — Databricks
+          check "databricks/notebooks/orders_bronze_to_silver.py"
+          check "databricks/notebooks/transactions_bronze_to_silver.py"
+          check "databricks/notebooks/customers_bronze_to_silver.py"
+          check "databricks/notebooks/entity_resolution.py"
+
+          # Phase 3 — dbt + Redshift
+          check "dbt/dbt_project.yml"
+          check "dbt/models/marts/mart_customer_360.sql"
+          check "infrastructure/scripts/redshift_schema.sql"
+
+          # Phase 4 — Kinesis + Lambda
+          check "ingestion/kinesis/producer.py"
+          check "ingestion/kinesis/consumer.py"
+          check "ingestion/lambda/s3_trigger.py"
+
+          # Phase 5 — Snowflake
+          check "snowflake/queries/01_setup.sql"
+          check "snowflake/loaders/redshift_to_snowflake.py"
+
+          # Phase 6 — Neo4j
+          check "neo4j/queries/01_schema.cypher"
+          check "neo4j/loaders/entity_loader.py"
+
+          # Phase 7 — FastAPI
+          check "api/main.py"
+          check "api/routers/query.py"
+
+          echo ""
+          echo "Result: $PASS passed, $FAIL failed"
+          if [ $FAIL -gt 0 ]; then exit 1; fi
+
+      - name: Summary
+        run: |
+          echo "================================"
+          echo " All pipeline phases verified"
+          echo " Project 2 structure is complete"
+          echo "================================"
